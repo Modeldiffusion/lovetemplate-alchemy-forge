@@ -1,19 +1,48 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Clock, CheckCircle2, BarChart3, TrendingUp, Users, Zap, AlertTriangle } from "lucide-react";
+import { analyticsApi } from "@/lib/api-client";
 
 export const DashboardHome = () => {
-  // Mock data for dashboard metrics
-  const metrics = {
-    totalTemplates: 1247,
-    pendingReview: 23,
-    conversionRate: 94.5,
-    avgProcessingTime: "2.3 min",
-    activeUsers: 156,
-    aiProcessingJobs: 8,
-    successfulConversions: 1174,
-    failedConversions: 73
+  const [metrics, setMetrics] = useState({
+    totalTemplates: 0,
+    pendingReview: 0,
+    conversionRate: 0,
+    avgProcessingTime: "0 min",
+    activeUsers: 0,
+    aiProcessingJobs: 0,
+    successfulConversions: 0,
+    failedConversions: 0
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardMetrics();
+  }, []);
+
+  const fetchDashboardMetrics = async () => {
+    try {
+      const response = await analyticsApi.getDashboardMetrics();
+      if (response.success && response.data) {
+        setMetrics({
+          totalTemplates: response.data.totalTemplates,
+          pendingReview: response.data.pendingReview,
+          conversionRate: response.data.conversionRate,
+          avgProcessingTime: response.data.avgProcessingTime,
+          activeUsers: response.data.activeUsers,
+          aiProcessingJobs: response.data.aiProcessingJobs,
+          successfulConversions: response.data.totalTemplates - response.data.pendingReview,
+          failedConversions: Math.round(response.data.totalTemplates * (1 - response.data.conversionRate / 100))
+        });
+      }
+    } catch (error) {
+      // Keep default values if API fails
+      console.error('Failed to fetch dashboard metrics:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

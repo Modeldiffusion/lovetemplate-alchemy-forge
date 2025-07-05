@@ -28,6 +28,9 @@ import {
   Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTagMappings } from "@/hooks/useTagMappings";
+import { useTemplates } from "@/hooks/useTemplates";
+import { useToast } from "@/hooks/use-toast";
 
 interface SourceTag {
   id: string;
@@ -76,61 +79,31 @@ export const TagMappingInterface = () => {
   const [selectedMappings, setSelectedMappings] = useState<string[]>([]);
   const [isTestingLogic, setIsTestingLogic] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  
+  const { templates } = useTemplates();
+  const { 
+    mappings, 
+    extractedTags, 
+    internalTags, 
+    loading, 
+    error,
+    createMapping,
+    updateMapping,
+    bulkMapTags
+  } = useTagMappings(selectedTemplate === "all" ? undefined : selectedTemplate);
+  const { toast } = useToast();
 
-  // Mock data
-  const [templates] = useState<Template[]>([
-    { id: "1", name: "Contract Template v2.1", tagCount: 23, mappedCount: 18, lastModified: "2 hours ago" },
-    { id: "2", name: "Invoice Format", tagCount: 15, mappedCount: 15, lastModified: "1 day ago" },
-    { id: "3", name: "Policy Document", tagCount: 31, mappedCount: 12, lastModified: "3 days ago" },
-    { id: "4", name: "User Manual Template", tagCount: 44, mappedCount: 28, lastModified: "1 week ago" }
-  ]);
-
-  const [sourceTags, setSourceTags] = useState<SourceTag[]>([
-    {
-      id: "1", name: "{{CLIENT_NAME}}", templateName: "Contract Template v2.1", templateId: "1",
-      position: 1, context: "This agreement is between {{CLIENT_NAME}} and Company", confidence: 98, pattern: "{{[A-Z_]+}}"
-    },
-    {
-      id: "2", name: "{{CONTRACT_DATE}}", templateName: "Contract Template v2.1", templateId: "1", 
-      position: 2, context: "Date of agreement: {{CONTRACT_DATE}}", confidence: 95, pattern: "{{[A-Z_]+}}"
-    },
-    {
-      id: "3", name: "{{INVOICE_NUMBER}}", templateName: "Invoice Format", templateId: "2",
-      position: 1, context: "Invoice #{{INVOICE_NUMBER}}", confidence: 99, pattern: "{{[A-Z_]+}}"
-    },
-    {
-      id: "4", name: "{{AMOUNT_DUE}}", templateName: "Invoice Format", templateId: "2",
-      position: 2, context: "Total Amount Due: {{AMOUNT_DUE}}", confidence: 97, pattern: "{{[A-Z_]+}}"
-    }
-  ]);
-
-  const [internalTags] = useState<InternalTag[]>([
-    { id: "1", name: "client.name", category: "Client Info", description: "Primary client name", dataType: "string" },
-    { id: "2", name: "client.company", category: "Client Info", description: "Client company name", dataType: "string" },
-    { id: "3", name: "contract.date", category: "Contract", description: "Contract execution date", dataType: "date" },
-    { id: "4", name: "contract.duration", category: "Contract", description: "Contract duration in months", dataType: "number" },
-    { id: "5", name: "invoice.number", category: "Financial", description: "Unique invoice identifier", dataType: "string" },
-    { id: "6", name: "amount.total", category: "Financial", description: "Total amount due", dataType: "currency" }
-  ]);
-
-  const [mappings, setMappings] = useState<TagMapping[]>([
-    {
-      id: "1", sourceTagId: "1", internalTagId: "1", status: "mapped", confidence: 95,
-      lastModified: "2 hours ago", modifiedBy: "John Smith"
-    },
-    {
-      id: "2", sourceTagId: "2", internalTagId: "3", status: "mapped", confidence: 90,
-      lastModified: "2 hours ago", modifiedBy: "John Smith"
-    },
-    {
-      id: "3", sourceTagId: "3", internalTagId: "5", status: "validated", confidence: 99,
-      lastModified: "1 day ago", modifiedBy: "Sarah Wilson", validationResult: "✓ Valid format"
-    },
-    {
-      id: "4", sourceTagId: "4", mappingLogic: "parseFloat(value.replace('$', '').replace(',', ''))", 
-      status: "logic", confidence: 85, lastModified: "1 day ago", modifiedBy: "Mike Johnson"
-    }
-  ]);
+  // Transform API data to match component interface
+  const sourceTags: SourceTag[] = extractedTags.map(tag => ({
+    id: tag.id,
+    name: tag.text,
+    templateName: tag.template?.name || "Unknown Template",
+    templateId: tag.templateId,
+    position: tag.position,
+    context: tag.context || "",
+    confidence: tag.confidence,
+    pattern: tag.pattern || ""
+  }));
 
   const filteredSourceTags = sourceTags.filter(tag => {
     const templateMatch = selectedTemplate === "all" || tag.templateId === selectedTemplate;
@@ -139,8 +112,8 @@ export const TagMappingInterface = () => {
     
     let statusMatch = true;
     if (statusFilter !== "all") {
-      const mapping = mappings.find(m => m.sourceTagId === tag.id);
-      const currentStatus = mapping?.status || "unmapped";
+      const mapping = mappings.find(m => m.extractedTagId === tag.id);
+      const currentStatus = mapping?.status.toLowerCase() || "unmapped";
       statusMatch = currentStatus === statusFilter;
     }
     
@@ -148,15 +121,15 @@ export const TagMappingInterface = () => {
   });
 
   const getMappingForTag = (tagId: string) => {
-    return mappings.find(m => m.sourceTagId === tagId);
+    return mappings.find(m => m.extractedTagId === tagId);
   };
 
   const getInternalTag = (id: string) => {
     return internalTags.find(t => t.id === id);
   };
 
-  const getStatusColor = (status: TagMapping['status']) => {
-    switch (status) {
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
       case 'mapped': return 'bg-primary text-primary-foreground';
       case 'validated': return 'bg-success text-success-foreground';
       case 'logic': return 'bg-accent text-accent-foreground';
@@ -165,8 +138,8 @@ export const TagMappingInterface = () => {
     }
   };
 
-  const getStatusIcon = (status: TagMapping['status'] | 'unmapped') => {
-    switch (status) {
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
       case 'mapped': case 'validated': return <CheckCircle2 className="w-4 h-4" />;
       case 'logic': return <Code className="w-4 h-4" />;
       case 'error': return <AlertCircle className="w-4 h-4" />;
@@ -174,61 +147,61 @@ export const TagMappingInterface = () => {
     }
   };
 
-  const handleMappingUpdate = (sourceTagId: string, updates: Partial<TagMapping>) => {
-    setMappings(prev => {
-      const existing = prev.find(m => m.sourceTagId === sourceTagId);
+  const handleMappingUpdate = async (sourceTagId: string, updates: any) => {
+    try {
+      const existing = mappings.find(m => m.extractedTagId === sourceTagId);
+      
       if (existing) {
-        return prev.map(m => m.sourceTagId === sourceTagId ? { ...m, ...updates } : m);
+        await updateMapping(existing.id, updates);
       } else {
-        const newMapping: TagMapping = {
-          id: Date.now().toString(),
-          sourceTagId,
-          status: 'unmapped',
-          confidence: 50,
-          lastModified: 'Just now',
-          modifiedBy: 'Current User',
-          ...updates
-        };
-        return [...prev, newMapping];
+        await createMapping({
+          extractedTagId: sourceTagId,
+          internalTagId: updates.internalTagId,
+          mappingLogic: updates.mappingLogic,
+          confidence: updates.confidence || 50
+        });
       }
-    });
+      
+      toast({
+        title: "Mapping updated",
+        description: "Tag mapping has been saved successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Update failed",
+        description: "Could not update tag mapping",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleBulkMap = async () => {
     setIsValidating(true);
-    // Simulate AI-powered bulk mapping
-    setTimeout(() => {
-      selectedMappings.forEach(sourceTagId => {
-        const sourceTag = sourceTags.find(t => t.id === sourceTagId);
-        if (sourceTag) {
-          // Simple similarity matching (in real app, this would use AI)
-          const bestMatch = internalTags.find(internal => 
-            sourceTag.name.toLowerCase().includes(internal.name.split('.')[1]?.toLowerCase() || '')
-          );
-          
-          if (bestMatch) {
-            handleMappingUpdate(sourceTagId, {
-              internalTagId: bestMatch.id,
-              status: 'mapped',
-              confidence: 85,
-              lastModified: 'Just now',
-              modifiedBy: 'AI Assistant'
-            });
-          }
-        }
-      });
-      setIsValidating(false);
+    try {
+      await bulkMapTags(selectedMappings);
       setSelectedMappings([]);
-    }, 2000);
+      toast({
+        title: "Bulk mapping completed",
+        description: `Successfully mapped ${selectedMappings.length} tags using AI`
+      });
+    } catch (error) {
+      toast({
+        title: "Bulk mapping failed",
+        description: "Could not complete AI-powered bulk mapping",
+        variant: "destructive"
+      });
+    } finally {
+      setIsValidating(false);
+    }
   };
 
   const validateMappings = async () => {
     setIsTestingLogic(true);
     setTimeout(() => {
       mappings.forEach(mapping => {
-        if (mapping.status === 'mapped' || mapping.status === 'logic') {
-          handleMappingUpdate(mapping.sourceTagId, {
-            status: 'validated',
+        if (mapping.status === 'MAPPED' || mapping.status === 'LOGIC') {
+          handleMappingUpdate(mapping.extractedTagId, {
+            status: 'VALIDATED',
             validationResult: '✓ Validation passed',
             confidence: Math.min(mapping.confidence + 5, 100)
           });
@@ -271,7 +244,7 @@ export const TagMappingInterface = () => {
                   <SelectItem value="all">All Templates ({sourceTags.length} tags)</SelectItem>
                   {templates.map(template => (
                     <SelectItem key={template.id} value={template.id}>
-                      {template.name} ({template.tagCount} tags)
+                      {template.name} ({template._count?.extractedTags || 0} tags)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -335,8 +308,8 @@ export const TagMappingInterface = () => {
               <CardTitle>Tag Mappings</CardTitle>
               <CardDescription>
                 {filteredSourceTags.length} tags • 
-                {mappings.filter(m => m.status === 'mapped' || m.status === 'validated').length} mapped • 
-                {mappings.filter(m => m.status === 'unmapped').length} unmapped
+                {mappings.filter(m => m.status === 'MAPPED' || m.status === 'VALIDATED').length} mapped • 
+                {mappings.filter(m => m.status === 'UNMAPPED').length} unmapped
               </CardDescription>
             </div>
             <div className="flex items-center space-x-2">
@@ -378,7 +351,7 @@ export const TagMappingInterface = () => {
             {filteredSourceTags.map((sourceTag) => {
               const mapping = getMappingForTag(sourceTag.id);
               const internalTag = mapping?.internalTagId ? getInternalTag(mapping.internalTagId) : null;
-              const status = mapping?.status || 'unmapped';
+              const status = mapping?.status.toLowerCase() || 'unmapped';
 
               return (
                 <div key={sourceTag.id} className="grid grid-cols-12 gap-4 p-3 border rounded-lg bg-card/50 hover:bg-card/80 transition-colors">

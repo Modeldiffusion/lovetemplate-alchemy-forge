@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,27 +12,8 @@ import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Settings, Zap, Brain, Key, TestTube, BarChart3, CheckCircle2, AlertCircle, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface LLMProvider {
-  id: string;
-  name: string;
-  status: 'active' | 'inactive' | 'error';
-  model: string;
-  apiKey: string;
-  baseUrl?: string;
-  maxTokens: number;
-  temperature: number;
-  topP: number;
-  frequencyPenalty: number;
-  presencePenalty: number;
-  systemPrompt: string;
-  rateLimitRPM: number;
-  rateLimitTPM: number;
-  costPer1KTokens: number;
-  health: 'excellent' | 'good' | 'poor';
-  lastTested: string;
-  responseTime: number;
-}
+import { aiApi, LLMProvider as APILLMProvider } from "@/lib/api-client";
+import { useToast } from "@/hooks/use-toast";
 
 interface TestResult {
   id: string;
@@ -47,65 +28,30 @@ interface TestResult {
 }
 
 export const AIConfiguration = () => {
-  const [providers, setProviders] = useState<LLMProvider[]>([
-    {
-      id: "1",
-      name: "OpenAI GPT-4",
-      status: "active",
-      model: "gpt-4-turbo-preview",
-      apiKey: "sk-*********************",
-      maxTokens: 4096,
-      temperature: 0.7,
-      topP: 1.0,
-      frequencyPenalty: 0.0,
-      presencePenalty: 0.0,
-      systemPrompt: "You are an expert at analyzing and extracting tags from documents. Focus on identifying key themes, categories, and metadata.",
-      rateLimitRPM: 500,
-      rateLimitTPM: 30000,
-      costPer1KTokens: 0.03,
-      health: "excellent",
-      lastTested: "5 minutes ago",
-      responseTime: 1.2
-    },
-    {
-      id: "2", 
-      name: "Claude 3.5 Sonnet",
-      status: "active",
-      model: "claude-3-5-sonnet-20241022",
-      apiKey: "sk-ant-*********************",
-      maxTokens: 4096,
-      temperature: 0.5,
-      topP: 1.0,
-      frequencyPenalty: 0.0,
-      presencePenalty: 0.0,
-      systemPrompt: "You are an expert document analyzer. Extract relevant tags and metadata with high accuracy and consistency.",
-      rateLimitRPM: 1000,
-      rateLimitTPM: 40000,
-      costPer1KTokens: 0.015,
-      health: "good",
-      lastTested: "12 minutes ago",
-      responseTime: 0.8
-    },
-    {
-      id: "3",
-      name: "Google Gemini Pro",
-      status: "inactive",
-      model: "gemini-pro",
-      apiKey: "AIza*********************",
-      maxTokens: 2048,
-      temperature: 0.6,
-      topP: 0.95,
-      frequencyPenalty: 0.0,
-      presencePenalty: 0.0,
-      systemPrompt: "Analyze documents and extract meaningful tags and categories. Provide detailed and accurate results.",
-      rateLimitRPM: 60,
-      rateLimitTPM: 32000,
-      costPer1KTokens: 0.001,
-      health: "good",
-      lastTested: "2 hours ago",
-      responseTime: 2.1
+  const [providers, setProviders] = useState<APILLMProvider[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchProviders();
+  }, []);
+
+  const fetchProviders = async () => {
+    try {
+      const response = await aiApi.getProviders();
+      if (response.success && response.data) {
+        setProviders(response.data);
+      }
+    } catch (error) {
+      toast({
+        title: "Failed to load providers",
+        description: "Could not fetch AI providers from server",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
 
   const [testResults, setTestResults] = useState<TestResult[]>([
     {
@@ -121,9 +67,16 @@ export const AIConfiguration = () => {
     }
   ]);
 
-  const [selectedProvider, setSelectedProvider] = useState<LLMProvider | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<APILLMProvider | null>(null);
   const [isAddingProvider, setIsAddingProvider] = useState(false);
-  const [newProvider, setNewProvider] = useState<Partial<LLMProvider>>({
+  const [newProvider, setNewProvider] = useState<{
+    name?: string;
+    model?: string;
+    apiKey?: string;
+    temperature?: number;
+    maxTokens?: number;
+    systemPrompt?: string;
+  }>({
     name: "",
     model: "",
     apiKey: "",
@@ -132,90 +85,110 @@ export const AIConfiguration = () => {
     systemPrompt: ""
   });
 
-  const getStatusColor = (status: LLMProvider['status']) => {
-    switch (status) {
-      case 'active':
-        return 'bg-success text-success-foreground';
-      case 'error':
-        return 'bg-destructive text-destructive-foreground';
-      default:
-        return 'bg-muted text-muted-foreground';
-    }
+  const getStatusColor = (isActive: boolean) => {
+    return isActive 
+      ? 'bg-success text-success-foreground'
+      : 'bg-muted text-muted-foreground';
   };
 
-  const getHealthColor = (health: LLMProvider['health']) => {
+  const getHealthColor = (health: string) => {
     switch (health) {
-      case 'excellent':
+      case 'EXCELLENT':
         return 'text-success';
-      case 'good':
+      case 'GOOD':
         return 'text-primary';
       default:
         return 'text-warning';
     }
   };
 
-  const handleProviderUpdate = (providerId: string, updates: Partial<LLMProvider>) => {
-    setProviders(prev => prev.map(provider => 
-      provider.id === providerId ? { ...provider, ...updates } : provider
-    ));
+  const handleProviderUpdate = async (providerId: string, updates: Partial<APILLMProvider>) => {
+    try {
+      const response = await aiApi.updateProvider(providerId, updates);
+      if (response.success && response.data) {
+        setProviders(prev => prev.map(provider => 
+          provider.id === providerId ? response.data! : provider
+        ));
+        toast({
+          title: "Provider updated",
+          description: "AI provider configuration has been saved"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Update failed",
+        description: "Could not update provider configuration",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleTestProvider = async (providerId: string) => {
-    const provider = providers.find(p => p.id === providerId);
-    if (!provider) return;
-
-    // Simulate API test
-    const testInput = "This is a sample contract document for testing AI tag extraction capabilities.";
-    
-    setTimeout(() => {
+    try {
+      const response = await aiApi.testProvider(providerId, "Test document for AI processing");
+      
       const newTest: TestResult = {
         id: Date.now().toString(),
-        provider: provider.name,
+        provider: providers.find(p => p.id === providerId)?.name || "Unknown",
         testCase: "API Connection Test",
-        input: testInput,
-        expectedOutput: "contract, document, legal",
-        actualOutput: "contract, document, legal, testing",
-        success: Math.random() > 0.2, // 80% success rate
-        responseTime: Math.random() * 3 + 0.5,
+        input: "Test document for AI processing",
+        expectedOutput: "document, test, processing",
+        actualOutput: response.data?.output || "Error",
+        success: response.success,
+        responseTime: response.data?.responseTime || 0,
         timestamp: "Just now"
       };
       
       setTestResults(prev => [newTest, ...prev]);
       
-      // Update provider health
-      handleProviderUpdate(providerId, {
-        health: newTest.success ? 'excellent' : 'poor',
-        lastTested: 'Just now',
-        responseTime: newTest.responseTime
+      toast({
+        title: response.success ? "Test successful" : "Test failed",
+        description: response.success 
+          ? `Provider responded in ${response.data?.responseTime.toFixed(2)}s`
+          : response.error || "Connection test failed",
+        variant: response.success ? "default" : "destructive"
       });
-    }, 2000);
+      
+    } catch (error) {
+      toast({
+        title: "Test failed",
+        description: "Could not test provider connection",
+        variant: "destructive"
+      });
+    }
   };
 
-  const addProvider = () => {
+  const addProvider = async () => {
     if (newProvider.name && newProvider.model && newProvider.apiKey) {
-      const provider: LLMProvider = {
-        id: Date.now().toString(),
-        name: newProvider.name,
-        status: 'inactive',
-        model: newProvider.model,
-        apiKey: newProvider.apiKey,
-        maxTokens: newProvider.maxTokens || 4096,
-        temperature: newProvider.temperature || 0.7,
-        topP: 1.0,
-        frequencyPenalty: 0.0,
-        presencePenalty: 0.0,
-        systemPrompt: newProvider.systemPrompt || "You are an expert document analyzer.",
-        rateLimitRPM: 100,
-        rateLimitTPM: 10000,
-        costPer1KTokens: 0.01,
-        health: 'good',
-        lastTested: 'Never',
-        responseTime: 0
-      };
-      
-      setProviders(prev => [...prev, provider]);
-      setNewProvider({});
-      setIsAddingProvider(false);
+      try {
+        const response = await aiApi.createProvider({
+          name: newProvider.name,
+          provider: newProvider.model.includes('gpt') ? 'openai' : 
+                   newProvider.model.includes('claude') ? 'anthropic' : 'google',
+          model: newProvider.model,
+          apiKey: newProvider.apiKey,
+          systemPrompt: newProvider.systemPrompt || "You are an expert document analyzer.",
+          maxTokens: newProvider.maxTokens,
+          temperature: newProvider.temperature
+        });
+        
+        if (response.success && response.data) {
+          setProviders(prev => [...prev, response.data!]);
+          setNewProvider({});
+          setIsAddingProvider(false);
+          
+          toast({
+            title: "Provider added",
+            description: "New AI provider has been configured successfully"
+          });
+        }
+      } catch (error) {
+        toast({
+          title: "Failed to add provider",
+          description: "Could not create new AI provider",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -333,13 +306,13 @@ export const AIConfiguration = () => {
                       <CardTitle className="text-lg">{provider.name}</CardTitle>
                     </div>
                     <div className="flex items-center space-x-1">
-                      <Badge className={cn("text-xs", getStatusColor(provider.status))}>
-                        {provider.status}
+                      <Badge className={cn("text-xs", getStatusColor(provider.isActive))}>
+                        {provider.isActive ? 'active' : 'inactive'}
                       </Badge>
                       <Switch 
-                        checked={provider.status === 'active'} 
+                        checked={provider.isActive} 
                         onCheckedChange={(checked) => 
-                          handleProviderUpdate(provider.id, { status: checked ? 'active' : 'inactive' })
+                          handleProviderUpdate(provider.id, { isActive: checked })
                         }
                       />
                     </div>
@@ -352,17 +325,17 @@ export const AIConfiguration = () => {
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Health:</span>
-                        <span className={cn("font-medium capitalize", getHealthColor(provider.health))}>
-                          {provider.health}
+                        <span className={cn("font-medium capitalize", getHealthColor(provider.healthStatus))}>
+                          {provider.healthStatus.toLowerCase()}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Response:</span>
-                        <span className="font-medium">{provider.responseTime.toFixed(1)}s</span>
+                        <span className="font-medium">{provider.averageLatency?.toFixed(1) || '0.0'}s</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Cost/1K:</span>
-                        <span className="font-medium">${provider.costPer1KTokens}</span>
+                        <span className="font-medium">$0.01</span>
                       </div>
                     </div>
                     
@@ -383,7 +356,7 @@ export const AIConfiguration = () => {
                   </div>
                   
                   <div className="text-xs text-muted-foreground">
-                    Last tested: {provider.lastTested}
+                    Last tested: {provider.lastUsedAt ? new Date(provider.lastUsedAt).toLocaleString() : 'Never'}
                   </div>
                   
                   <div className="flex space-x-2">
@@ -396,12 +369,12 @@ export const AIConfiguration = () => {
                       <TestTube className="w-3 h-3 mr-1" />
                       Test
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => setSelectedProvider(provider)}
-                    >
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => setSelectedProvider(provider)}
+                      >
                       <Settings className="w-3 h-3 mr-1" />
                       Config
                     </Button>
@@ -436,8 +409,8 @@ export const AIConfiguration = () => {
                       <Input 
                         id="api-key"
                         type="password"
-                        value={selectedProvider.apiKey}
-                        onChange={(e) => handleProviderUpdate(selectedProvider.id, { apiKey: e.target.value })}
+                        value="***hidden***"
+                        readOnly
                       />
                     </div>
                     
@@ -468,26 +441,26 @@ export const AIConfiguration = () => {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="top-p">Top P: {selectedProvider.topP}</Label>
+                      <Label htmlFor="top-p">Top P: 1.0</Label>
                       <Slider
                         id="top-p"
                         min={0}
                         max={1}
                         step={0.05}
-                        value={[selectedProvider.topP]}
-                        onValueChange={([value]) => handleProviderUpdate(selectedProvider.id, { topP: value })}
+                        value={[1.0]}
+                        disabled
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="frequency-penalty">Frequency Penalty: {selectedProvider.frequencyPenalty}</Label>
+                      <Label htmlFor="frequency-penalty">Frequency Penalty: 0.0</Label>
                       <Slider
                         id="frequency-penalty"
                         min={-2}
                         max={2}
                         step={0.1}
-                        value={[selectedProvider.frequencyPenalty]}
-                        onValueChange={([value]) => handleProviderUpdate(selectedProvider.id, { frequencyPenalty: value })}
+                        value={[0.0]}
+                        disabled
                       />
                     </div>
                   </div>
@@ -588,7 +561,7 @@ export const AIConfiguration = () => {
                   <Zap className="w-5 h-5 text-primary" />
                   <div>
                     <div className="text-2xl font-bold">
-                      {providers.filter(p => p.status === 'active').length}
+                      {providers.filter(p => p.isActive).length}
                     </div>
                     <p className="text-xs text-muted-foreground">Active Providers</p>
                   </div>
@@ -616,7 +589,7 @@ export const AIConfiguration = () => {
                   <Key className="w-5 h-5 text-warning" />
                   <div>
                     <div className="text-2xl font-bold">
-                      {(providers.reduce((sum, p) => sum + p.responseTime, 0) / providers.length).toFixed(1)}s
+                      {(providers.reduce((sum, p) => sum + (p.averageLatency || 0), 0) / providers.length).toFixed(1)}s
                     </div>
                     <p className="text-xs text-muted-foreground">Avg Response</p>
                   </div>
@@ -647,11 +620,10 @@ export const AIConfiguration = () => {
                 {providers.map((provider) => (
                   <div key={provider.id} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
-                      <div className={cn(
-                        "w-3 h-3 rounded-full",
-                        provider.status === 'active' ? 'bg-success' : 
-                        provider.status === 'error' ? 'bg-destructive' : 'bg-muted'
-                      )} />
+                    <div className={cn(
+                      "w-3 h-3 rounded-full",
+                      provider.isActive ? 'bg-success' : 'bg-muted'
+                    )} />
                       <div>
                         <p className="font-medium">{provider.name}</p>
                         <p className="text-sm text-muted-foreground">{provider.model}</p>
@@ -659,17 +631,17 @@ export const AIConfiguration = () => {
                     </div>
                     <div className="flex items-center space-x-6 text-sm">
                       <div className="text-center">
-                        <p className="font-medium">{provider.responseTime.toFixed(1)}s</p>
+                        <p className="font-medium">{provider.averageLatency?.toFixed(1) || '0.0'}s</p>
                         <p className="text-xs text-muted-foreground">Response</p>
                       </div>
                       <div className="text-center">
-                        <p className={cn("font-medium", getHealthColor(provider.health))}>
-                          {provider.health}
+                        <p className={cn("font-medium", getHealthColor(provider.healthStatus))}>
+                          {provider.healthStatus.toLowerCase()}
                         </p>
                         <p className="text-xs text-muted-foreground">Health</p>
                       </div>
                       <div className="text-center">
-                        <p className="font-medium">${provider.costPer1KTokens}</p>
+                        <p className="font-medium">$0.01</p>
                         <p className="text-xs text-muted-foreground">Cost/1K</p>
                       </div>
                     </div>

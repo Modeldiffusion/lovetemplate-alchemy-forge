@@ -5,6 +5,8 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Upload, File, X, CheckCircle2, AlertCircle, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTemplates } from "@/hooks/useTemplates";
+import { useToast } from "@/hooks/use-toast";
 
 interface UploadedFile {
   id: string;
@@ -20,6 +22,8 @@ interface UploadedFile {
 export const TemplateUpload = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const { templates, uploadTemplate, loading, error } = useTemplates();
+  const { toast } = useToast();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -44,7 +48,7 @@ export const TemplateUpload = () => {
     processFiles(selectedFiles);
   }, []);
 
-  const processFiles = (fileList: File[]) => {
+  const processFiles = async (fileList: File[]) => {
     const newFiles: UploadedFile[] = fileList.map(file => ({
       id: Math.random().toString(36).substring(7),
       name: file.name,
@@ -56,49 +60,66 @@ export const TemplateUpload = () => {
 
     setFiles(prev => [...prev, ...newFiles]);
 
-    // Simulate upload and processing
-    newFiles.forEach(file => {
-      simulateFileProcessing(file.id);
-    });
-  };
-
-  const simulateFileProcessing = (fileId: string) => {
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 15;
+    // Upload files using real API
+    for (const [index, file] of fileList.entries()) {
+      const uploadedFile = newFiles[index];
       
-      setFiles(prev => prev.map(file => {
-        if (file.id === fileId) {
-          if (progress >= 100) {
-            clearInterval(interval);
-            return {
-              ...file,
-              status: 'processing',
-              progress: 100
-            };
-          }
-          return { ...file, progress: Math.min(progress, 100) };
-        }
-        return file;
-      }));
-    }, 300);
+      try {
+        // Update progress to uploading
+        setFiles(prev => prev.map(f => 
+          f.id === uploadedFile.id ? { ...f, status: 'uploading', progress: 50 } : f
+        ));
 
-    // Simulate processing completion
-    setTimeout(() => {
-      setFiles(prev => prev.map(file => {
-        if (file.id === fileId) {
-          const isSuccess = Math.random() > 0.1; // 90% success rate
-          return {
-            ...file,
-            status: isSuccess ? 'completed' : 'error',
-            tags: isSuccess ? ['contract', 'legal', 'template'] : undefined,
-            error: isSuccess ? undefined : 'Failed to extract tags from document'
-          };
-        }
-        return file;
-      }));
-    }, 2000 + Math.random() * 3000);
+        const result = await uploadTemplate(file, { 
+          name: file.name,
+          description: `Uploaded file: ${file.name}`
+        });
+
+        // Update to processing
+        setFiles(prev => prev.map(f => 
+          f.id === uploadedFile.id ? { 
+            ...f, 
+            status: 'processing', 
+            progress: 80 
+          } : f
+        ));
+
+        // Simulate AI processing delay
+        setTimeout(() => {
+          setFiles(prev => prev.map(f => 
+            f.id === uploadedFile.id ? {
+              ...f,
+              status: 'completed',
+              progress: 100,
+              tags: ['ai-extracted', 'processed', 'template']
+            } : f
+          ));
+          
+          toast({
+            title: "Upload successful",
+            description: `${file.name} has been processed successfully.`
+          });
+        }, 2000);
+
+      } catch (err) {
+        setFiles(prev => prev.map(f => 
+          f.id === uploadedFile.id ? {
+            ...f,
+            status: 'error',
+            progress: 100,
+            error: err instanceof Error ? err.message : 'Upload failed'
+          } : f
+        ));
+        
+        toast({
+          title: "Upload failed",
+          description: `Failed to upload ${file.name}`,
+          variant: "destructive"
+        });
+      }
+    }
   };
+
 
   const removeFile = (fileId: string) => {
     setFiles(prev => prev.filter(file => file.id !== fileId));
