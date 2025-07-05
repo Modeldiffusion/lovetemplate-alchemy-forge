@@ -112,11 +112,11 @@ export const useExtractedTags = (templateId?: string) => {
     }
   };
 
-  const extractTags = async (templateId: string) => {
+  const extractTags = async (templateId: string, extractionConfig?: any) => {
     try {
       setLoading(true);
       const { data, error } = await supabase.functions.invoke('extract-tags', {
-        body: { templateId }
+        body: { templateId, extractionConfig }
       });
 
       if (error) throw error;
