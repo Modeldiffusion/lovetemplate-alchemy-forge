@@ -164,9 +164,10 @@ serve(async (req) => {
     
     // Build regex pattern for delimiter pairs and @ tags
     const buildExtractionRegex = (delimiterPairs, caseSensitive) => {
-      // Escape special regex characters properly
+      // Escape special regex characters properly, including Unicode characters
       const escapeRegex = (str) => {
-        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Handle Unicode characters like « and » by escaping them properly
+        return str.replace(/[.*+?^${}()|[\]\\«»]/g, '\\$&');
       };
       
       const patterns = [];
