@@ -25,7 +25,7 @@ serve(async (req) => {
     const body = await req.json();
     console.log('Request body:', JSON.stringify(body, null, 2));
 
-    const { templateId } = body;
+    const { templateId, extractionConfig } = body;
     if (!templateId) {
       console.error('❌ No template ID provided');
       return new Response(
@@ -34,6 +34,7 @@ serve(async (req) => {
       );
     }
     console.log('✅ Template ID:', templateId);
+    console.log('✅ Extraction Config:', extractionConfig);
 
     // Step 2: Check environment
     console.log('Step 2: Checking environment...');
@@ -229,17 +230,63 @@ Date: [SIGNATURE_DATE]
     console.log('Template content prepared, length:', templateContent.length);
     console.log('Sample content preview:', templateContent.substring(0, 200) + '...');
 
-    // Step 6: Use regex to extract tags in [TAG_NAME] format
-    console.log('Step 6: Extracting tags using regex...');
-    const tagRegex = /\[([A-Z_][A-Z0-9_]*)\]/g;
+    // Step 6: Build dynamic regex based on extraction config
+    console.log('Step 6: Building extraction regex...');
+    
+    // Default delimiter configuration
+    const defaultConfig = {
+      startDelimiters: ['['],
+      endDelimiters: [']'],
+      caseSensitive: false,
+      includeDelimiters: true
+    };
+    
+    const config = { ...defaultConfig, ...extractionConfig };
+    console.log('Using extraction config:', config);
+    
+    // Build regex pattern for multiple delimiter combinations
+    const buildExtractionRegex = (startDelims, endDelims, caseSensitive) => {
+      // Escape special regex characters
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
+      // Build start delimiter pattern
+      const startPattern = startDelims.map(escapeRegex).join('|');
+      
+      // Build end delimiter pattern
+      const endPattern = endDelims.map(delim => {
+        if (delim === ' ') {
+          return '\\s+'; // Match one or more whitespace characters
+        }
+        return escapeRegex(delim);
+      }).join('|');
+      
+      // Build the main pattern
+      // Capture: (start_delimiter)(tag_content)(end_delimiter)
+      const pattern = `(${startPattern})([A-Z_][A-Z0-9_]*)(${endPattern})`;
+      
+      const flags = caseSensitive ? 'g' : 'gi';
+      return new RegExp(pattern, flags);
+    };
+    
+    const tagRegex = buildExtractionRegex(
+      config.startDelimiters, 
+      config.endDelimiters, 
+      config.caseSensitive
+    );
+    
+    console.log('Generated regex:', tagRegex);
     const extractedTags = [];
     const seenTags = new Set();
     let match;
     let position = 1;
 
     while ((match = tagRegex.exec(templateContent)) !== null) {
-      const tagText = match[0]; // Full match including delimiters [TAG_NAME]
-      const tagContent = match[1]; // Just the content inside delimiters
+      const fullMatch = match[0]; // Full match including delimiters
+      const startDelim = match[1]; // Start delimiter
+      const tagContent = match[2]; // Tag content without delimiters  
+      const endDelim = match[3]; // End delimiter
+      
+      const tagText = config.includeDelimiters ? fullMatch : tagContent;
       
       // Skip if we've already seen this tag
       if (seenTags.has(tagText)) {
@@ -253,7 +300,7 @@ Date: [SIGNATURE_DATE]
       const context = templateContent.substring(start, end).trim();
 
       // Determine pattern/category based on tag content
-      let pattern = 'General placeholder';
+      let pattern = `${startDelim}...${endDelim} placeholder`;
       let confidence = 85;
 
       if (tagContent.includes('DATE')) {
@@ -287,7 +334,10 @@ Date: [SIGNATURE_DATE]
         pattern: pattern,
         position: position++,
         context: context,
-        confidence: confidence
+        confidence: confidence,
+        startDelimiter: startDelim,
+        endDelimiter: endDelim,
+        tagContent: tagContent
       });
     }
 

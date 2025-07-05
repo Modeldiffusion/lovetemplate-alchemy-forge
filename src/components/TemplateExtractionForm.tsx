@@ -21,8 +21,9 @@ export const TemplateExtractionForm = () => {
   const { extractTags, loading } = useExtractedTags();
 
   const [regexPattern, setRegexPattern] = useState("");
-  const [startChar, setStartChar] = useState("[");
-  const [endChar, setEndChar] = useState("]");
+  const [startDelimiters, setStartDelimiters] = useState<string[]>(["["]);
+  const [endDelimiters, setEndDelimiters] = useState<string[]>(["]"]);
+  const [includeDelimiters, setIncludeDelimiters] = useState(true);
   const [extractionMethod, setExtractionMethod] = useState<"regex" | "delimiters">("delimiters");
 
   // Handle bulk extraction
@@ -60,7 +61,24 @@ export const TemplateExtractionForm = () => {
 
       // Now try the actual extraction
       for (const template of targetTemplates) {
-        await extractTags(template.id);
+        const extractionConfig = {
+          startDelimiters,
+          endDelimiters,
+          includeDelimiters,
+          caseSensitive: false
+        };
+        
+        const { data, error } = await supabase.functions.invoke('extract-tags', {
+          body: { 
+            templateId: template.id,
+            extractionConfig
+          }
+        });
+        
+        if (error || !data?.success) {
+          throw new Error(data?.error || `Extraction failed for ${template.name}`);
+        }
+        
         toast.success(`Tags extracted from ${template.name}`);
       }
       
@@ -166,38 +184,115 @@ export const TemplateExtractionForm = () => {
               <TabsContent value="delimiters" className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="startChar">Start Character</Label>
-                    <Input
-                      id="startChar"
-                      value={startChar}
-                      onChange={(e) => setStartChar(e.target.value)}
-                      placeholder="["
-                      maxLength={5}
-                    />
+                    <Label>Start Delimiters</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {startDelimiters.map((delim, index) => (
+                        <Badge key={index} variant="outline" className="flex items-center gap-1">
+                          {delim === ' ' ? 'SPACE' : delim}
+                          <button
+                            onClick={() => setStartDelimiters(prev => prev.filter((_, i) => i !== index))}
+                            className="ml-1 text-red-500 hover:text-red-700"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add delimiter"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            const value = (e.target as HTMLInputElement).value.trim();
+                            if (value && !startDelimiters.includes(value)) {
+                              setStartDelimiters(prev => [...prev, value]);
+                              (e.target as HTMLInputElement).value = '';
+                            }
+                          }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (!startDelimiters.includes(' ')) {
+                            setStartDelimiters(prev => [...prev, ' ']);
+                          }
+                        }}
+                      >
+                        + Space
+                      </Button>
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      Character(s) that mark the beginning of a tag
+                      Characters that mark the beginning of tags
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="endChar">End Character</Label>
-                    <Input
-                      id="endChar"
-                      value={endChar}
-                      onChange={(e) => setEndChar(e.target.value)}
-                      placeholder="]"
-                      maxLength={5}
-                    />
+                    <Label>End Delimiters</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {endDelimiters.map((delim, index) => (
+                        <Badge key={index} variant="outline" className="flex items-center gap-1">
+                          {delim === ' ' ? 'SPACE' : delim}
+                          <button
+                            onClick={() => setEndDelimiters(prev => prev.filter((_, i) => i !== index))}
+                            className="ml-1 text-red-500 hover:text-red-700"
+                          >
+                            ×
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add delimiter"
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            const value = (e.target as HTMLInputElement).value.trim();
+                            if (value && !endDelimiters.includes(value)) {
+                              setEndDelimiters(prev => [...prev, value]);
+                              (e.target as HTMLInputElement).value = '';
+                            }
+                          }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (!endDelimiters.includes(' ')) {
+                            setEndDelimiters(prev => [...prev, ' ']);
+                          }
+                        }}
+                      >
+                        + Space
+                      </Button>
+                    </div>
                     <p className="text-xs text-muted-foreground">
-                      Character(s) that mark the end of a tag
+                      Characters that mark the end of tags
                     </p>
                   </div>
                 </div>
+                <div className="flex items-center space-x-2 mb-4">
+                  <input
+                    type="checkbox"
+                    id="includeDelimitersForm"
+                    checked={includeDelimiters}
+                    onChange={(e) => setIncludeDelimiters(e.target.checked)}
+                    className="rounded"
+                  />
+                  <Label htmlFor="includeDelimitersForm">Include delimiters in extracted tags</Label>
+                </div>
                 <div className="bg-muted/50 p-3 rounded-lg">
-                  <p className="text-sm font-medium mb-1">Example:</p>
-                  <p className="text-sm text-muted-foreground">
-                    With start "{startChar}" and end "{endChar}", tags like{" "}
-                    <code className="bg-muted px-1 rounded">{startChar}COMPANY_NAME{endChar}</code> will be extracted.
-                  </p>
+                  <p className="text-sm font-medium mb-1">Examples:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {startDelimiters.slice(0, 2).map((start, i) => (
+                      endDelimiters.slice(0, 2).map((end, j) => (
+                        <code key={`${i}-${j}`} className="bg-muted px-1 rounded text-xs">
+                          {start === ' ' ? '' : start}TAG_NAME{end === ' ' ? ' ' : end}
+                        </code>
+                      ))
+                    ))}
+                  </div>
                 </div>
               </TabsContent>
 

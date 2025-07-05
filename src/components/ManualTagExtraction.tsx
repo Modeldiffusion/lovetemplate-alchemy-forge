@@ -20,19 +20,38 @@ export const ManualTagExtraction = () => {
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [extracting, setExtracting] = useState(false);
   const [previewTags, setPreviewTags] = useState<string[]>([]);
+  const [startDelimiters, setStartDelimiters] = useState<string[]>(['[']);
+  const [endDelimiters, setEndDelimiters] = useState<string[]>([']']);
+  const [includeDelimiters, setIncludeDelimiters] = useState(true);
   const { templates } = useTemplates();
+
+  // Build preview regex based on current delimiter settings
+  const buildPreviewRegex = () => {
+    const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    
+    const startPattern = startDelimiters.map(escapeRegex).join('|');
+    const endPattern = endDelimiters.map(delim => {
+      if (delim === ' ') return '\\s+';
+      return escapeRegex(delim);
+    }).join('|');
+    
+    return new RegExp(`(${startPattern})([A-Z_][A-Z0-9_]*)(${endPattern})`, 'gi');
+  };
 
   // Preview tags as user types
   const handleContentChange = (content: string) => {
     setTemplateContent(content);
     
-    // Extract tags for preview
-    const tagRegex = /\[([A-Z_][A-Z0-9_]*)\]/g;
+    // Extract tags for preview using current delimiter configuration
+    const tagRegex = buildPreviewRegex();
     const foundTags = new Set<string>();
     let match;
     
     while ((match = tagRegex.exec(content)) !== null) {
-      foundTags.add(match[1]);
+      const fullMatch = match[0];
+      const tagContent = match[2];
+      const tagToAdd = includeDelimiters ? fullMatch : tagContent;
+      foundTags.add(tagToAdd);
     }
     
     setPreviewTags(Array.from(foundTags));
@@ -65,9 +84,17 @@ export const ManualTagExtraction = () => {
         // Continue anyway, the extraction might still work
       }
 
-      // Now call the extraction function
+      // Now call the extraction function with delimiter configuration
       const { data, error } = await supabase.functions.invoke('extract-tags', {
-        body: { templateId: selectedTemplateId }
+        body: { 
+          templateId: selectedTemplateId,
+          extractionConfig: {
+            startDelimiters,
+            endDelimiters,
+            includeDelimiters,
+            caseSensitive: false
+          }
+        }
       });
 
       if (error) {
@@ -183,12 +210,134 @@ Date: [SIGNATURE_DATE]`;
         </CardContent>
       </Card>
 
+      {/* Delimiter Configuration */}
+      <Card className="bg-gradient-card shadow-custom-sm">
+        <CardHeader>
+          <CardTitle>2. Configure Delimiters</CardTitle>
+          <CardDescription>
+            Set up the start and end characters that wrap your placeholders
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Start Delimiters</Label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {startDelimiters.map((delim, index) => (
+                  <Badge key={index} variant="outline" className="flex items-center gap-1">
+                    {delim === ' ' ? 'SPACE' : delim}
+                    <button
+                      onClick={() => setStartDelimiters(prev => prev.filter((_, i) => i !== index))}
+                      className="ml-1 text-red-500 hover:text-red-700"
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Add delimiter"
+                  className="flex-1 px-2 py-1 text-sm border rounded"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const value = (e.target as HTMLInputElement).value.trim();
+                      if (value && !startDelimiters.includes(value)) {
+                        setStartDelimiters(prev => [...prev, value]);
+                        (e.target as HTMLInputElement).value = '';
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (!startDelimiters.includes(' ')) {
+                      setStartDelimiters(prev => [...prev, ' ']);
+                    }
+                  }}
+                >
+                  + Space
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>End Delimiters</Label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {endDelimiters.map((delim, index) => (
+                  <Badge key={index} variant="outline" className="flex items-center gap-1">
+                    {delim === ' ' ? 'SPACE' : delim}
+                    <button
+                      onClick={() => setEndDelimiters(prev => prev.filter((_, i) => i !== index))}
+                      className="ml-1 text-red-500 hover:text-red-700"
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Add delimiter"
+                  className="flex-1 px-2 py-1 text-sm border rounded"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const value = (e.target as HTMLInputElement).value.trim();
+                      if (value && !endDelimiters.includes(value)) {
+                        setEndDelimiters(prev => [...prev, value]);
+                        (e.target as HTMLInputElement).value = '';
+                      }
+                    }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (!endDelimiters.includes(' ')) {
+                      setEndDelimiters(prev => [...prev, ' ']);
+                    }
+                  }}
+                >
+                  + Space
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="includeDelimiters"
+              checked={includeDelimiters}
+              onChange={(e) => setIncludeDelimiters(e.target.checked)}
+              className="rounded"
+            />
+            <Label htmlFor="includeDelimiters">Include delimiters in extracted tags</Label>
+          </div>
+          <div className="bg-muted/50 p-3 rounded-lg">
+            <p className="text-sm font-medium mb-1">Current Pattern Examples:</p>
+            <div className="flex flex-wrap gap-2">
+              {startDelimiters.slice(0, 2).map((start, i) => (
+                endDelimiters.slice(0, 2).map((end, j) => (
+                  <Badge key={`${i}-${j}`} variant="outline" className="bg-blue-100 text-blue-800">
+                    {start === ' ' ? '' : start}TAG_NAME{end === ' ' ? ' ' : end}
+                  </Badge>
+                ))
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Content Input */}
       <Card className="bg-gradient-card shadow-custom-md">
         <CardHeader>
-          <CardTitle>2. Paste Template Content</CardTitle>
+          <CardTitle>3. Paste Template Content</CardTitle>
           <CardDescription>
-            Copy your template content and paste it below. The system will extract all [TAG_NAME] placeholders.
+            Copy your template content and paste it below. The system will extract placeholders using your delimiter configuration.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -225,7 +374,7 @@ Date: [SIGNATURE_DATE]`;
               <div className="flex flex-wrap gap-2">
                 {previewTags.map((tag, index) => (
                   <Badge key={index} variant="outline" className="bg-green-100 text-green-800">
-                    [{tag}]
+                    {tag}
                   </Badge>
                 ))}
               </div>
