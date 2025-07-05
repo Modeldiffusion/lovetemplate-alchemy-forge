@@ -7,6 +7,7 @@ import { Upload, File, X, CheckCircle2, AlertCircle, FileText } from "lucide-rea
 import { cn } from "@/lib/utils";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface UploadedFile {
   id: string;
@@ -25,6 +26,24 @@ export const TemplateUpload = () => {
   const [uploadMode, setUploadMode] = useState<'single' | 'bulk'>('single');
   const { templates, uploadTemplate, loading, error } = useTemplates();
   const { toast } = useToast();
+
+  // Helper function to read file content
+  const readFileContent = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (reader.result) {
+          // Convert to base64 for transmission
+          const base64 = btoa(reader.result as string);
+          resolve(base64);
+        } else {
+          reject(new Error('Failed to read file'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsText(file);
+    });
+  };
 
   const processFiles = useCallback(async (fileList: File[]) => {
     // Validate file count based on mode
@@ -70,12 +89,33 @@ export const TemplateUpload = () => {
           throw new Error(result.error);
         }
 
+        // Update to processing
+        setFiles(prev => prev.map(f => 
+          f.id === uploadedFile.id ? { ...f, status: 'processing', progress: 60 } : f
+        ));
+
+        // Read file content and process it
+        const fileContent = await readFileContent(file);
+        
+        // Process file content through edge function
+        const { data: processData, error: processError } = await supabase.functions.invoke('process-file', {
+          body: { 
+            templateId: result.data.id,
+            fileContent: fileContent,
+            fileType: file.type
+          }
+        });
+
+        if (processError || !processData?.success) {
+          throw new Error(processData?.error || 'File processing failed');
+        }
+
         setFiles(prev => prev.map(f => 
           f.id === uploadedFile.id ? {
             ...f,
             status: 'completed',
             progress: 100,
-            tags: ['uploaded', 'processed']
+            tags: ['uploaded', 'processed', 'ready-for-extraction']
           } : f
         ));
         
