@@ -1,0 +1,447 @@
+// Template Conversion Tool - Database Schema
+// This file defines the complete database structure for the application
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  role          Role     @default(CONVERTER)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastLoginAt   DateTime?
+
+  // Relations
+  uploadedTemplates Template[]
+  tagMappings      TagMapping[]
+  conversions      Conversion[]
+  reviews          Review[]
+  comments         Comment[]
+  changeRequests   ChangeRequest[]
+  auditLogs        AuditLog[]
+
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  REVIEWER
+  CONVERTER
+  VIEWER
+}
+
+// Template Management
+model Template {
+  id              String          @id @default(cuid())
+  name            String
+  originalName    String
+  filePath        String
+  fileType        String
+  fileSize        Int
+  version         Int             @default(1)
+  status          TemplateStatus  @default(UPLOADED)
+  uploadedById    String
+  uploadedAt      DateTime        @default(now())
+  processedAt     DateTime?
+  lastModifiedAt  DateTime        @updatedAt
+  
+  // AI Processing Results
+  aiProcessingStatus ProcessingStatus @default(PENDING)
+  aiConfidence      Float?
+  extractedText     String?          @db.LongText
+  processingError   String?          @db.Text
+
+  // Relations
+  uploadedBy      User            @relation(fields: [uploadedById], references: [id])
+  extractedTags   ExtractedTag[]
+  conversions     Conversion[]
+  versions        TemplateVersion[]
+  
+  @@map("templates")
+}
+
+model TemplateVersion {
+  id          String    @id @default(cuid())
+  templateId  String
+  version     Int
+  filePath    String
+  changes     String?   @db.Text
+  createdAt   DateTime  @default(now())
+  createdBy   String
+  
+  template    Template  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  
+  @@unique([templateId, version])
+  @@map("template_versions")
+}
+
+enum TemplateStatus {
+  UPLOADED
+  PROCESSING
+  PROCESSED
+  ERROR
+  ARCHIVED
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// AI and Tag Management
+model LLMProvider {
+  id                String   @id @default(cuid())
+  name              String   @unique
+  provider          String   // openai, anthropic, google
+  model             String
+  apiKeyHash        String   // encrypted API key
+  baseUrl           String?
+  isActive          Boolean  @default(true)
+  
+  // Configuration
+  maxTokens         Int      @default(4096)
+  temperature       Float    @default(0.7)
+  topP              Float    @default(1.0)
+  frequencyPenalty  Float    @default(0.0)
+  presencePenalty   Float    @default(0.0)
+  systemPrompt      String   @db.Text
+  
+  // Rate Limiting
+  rateLimitRPM      Int      @default(100)
+  rateLimitTPM      Int      @default(10000)
+  
+  // Monitoring
+  totalRequests     Int      @default(0)
+  totalTokens       Int      @default(0)
+  averageLatency    Float?
+  lastUsedAt        DateTime?
+  healthStatus      HealthStatus @default(UNKNOWN)
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  extractedTags     ExtractedTag[]
+  testResults       LLMTestResult[]
+  
+  @@map("llm_providers")
+}
+
+enum HealthStatus {
+  EXCELLENT
+  GOOD
+  POOR
+  ERROR
+  UNKNOWN
+}
+
+model LLMTestResult {
+  id           String      @id @default(cuid())
+  providerId   String
+  testCase     String
+  input        String      @db.Text
+  expectedOutput String?   @db.Text
+  actualOutput String?    @db.Text
+  success      Boolean
+  responseTime Float       // in seconds
+  errorMessage String?     @db.Text
+  createdAt    DateTime    @default(now())
+  
+  provider     LLMProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  
+  @@map("llm_test_results")
+}
+
+// Tag System
+model ExtractedTag {
+  id           String   @id @default(cuid())
+  templateId   String
+  text         String
+  pattern      String?
+  position     Int      // position in document
+  context      String?  @db.Text
+  confidence   Float
+  providerId   String?  // which LLM extracted this
+  
+  extractedAt  DateTime @default(now())
+  
+  // Relations
+  template     Template     @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  provider     LLMProvider? @relation(fields: [providerId], references: [id])
+  mappings     TagMapping[]
+  
+  @@map("extracted_tags")
+}
+
+model InternalTag {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  category     String
+  description  String?
+  dataType     String   @default("string") // string, number, date, currency, boolean
+  validation   String?  @db.Text // validation rules/regex
+  isRequired   Boolean  @default(false)
+  defaultValue String?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  mappings     TagMapping[]
+  
+  @@map("internal_tags")
+}
+
+model TagMapping {
+  id              String        @id @default(cuid())
+  extractedTagId  String
+  internalTagId   String?
+  mappingLogic    String?       @db.Text // custom JavaScript logic
+  status          MappingStatus @default(UNMAPPED)
+  confidence      Float         @default(0)
+  validationResult String?      @db.Text
+  
+  createdById     String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  // Relations
+  extractedTag    ExtractedTag  @relation(fields: [extractedTagId], references: [id], onDelete: Cascade)
+  internalTag     InternalTag?  @relation(fields: [internalTagId], references: [id])
+  createdBy       User          @relation(fields: [createdById], references: [id])
+  
+  @@unique([extractedTagId, internalTagId])
+  @@map("tag_mappings")
+}
+
+enum MappingStatus {
+  UNMAPPED
+  MAPPED
+  LOGIC
+  VALIDATED
+  ERROR
+}
+
+// Conversion System
+model Conversion {
+  id                String           @id @default(cuid())
+  templateId        String
+  status            ConversionStatus @default(PENDING)
+  outputFilePath    String?
+  errorMessage      String?          @db.Text
+  
+  // Conversion Settings
+  preserveFormatting Boolean         @default(true)
+  validateOutput     Boolean         @default(true)
+  
+  // Metrics
+  totalTags         Int              @default(0)
+  mappedTags        Int              @default(0)
+  unmappedTags      Int              @default(0)
+  processingTime    Float?           // in seconds
+  
+  createdById       String
+  createdAt         DateTime         @default(now())
+  completedAt       DateTime?
+  
+  // Relations
+  template          Template         @relation(fields: [templateId], references: [id])
+  createdBy         User             @relation(fields: [createdById], references: [id])
+  reviews           Review[]
+  comparisons       DocumentComparison[]
+  
+  @@map("conversions")
+}
+
+enum ConversionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// Document Comparison
+model DocumentComparison {
+  id                String    @id @default(cuid())
+  conversionId      String
+  originalFilePath  String
+  convertedFilePath String
+  comparisonData    String    @db.LongText // JSON with comparison results
+  
+  // Statistics
+  totalChanges      Int       @default(0)
+  additions         Int       @default(0)
+  deletions         Int       @default(0)
+  modifications     Int       @default(0)
+  
+  createdAt         DateTime  @default(now())
+  
+  // Relations
+  conversion        Conversion @relation(fields: [conversionId], references: [id], onDelete: Cascade)
+  comments          Comment[]
+  
+  @@map("document_comparisons")
+}
+
+model Comment {
+  id             String              @id @default(cuid())
+  comparisonId   String
+  lineNumber     Int
+  content        String              @db.Text
+  isResolved     Boolean             @default(false)
+  
+  authorId       String
+  createdAt      DateTime            @default(now())
+  resolvedAt     DateTime?
+  
+  // Relations
+  comparison     DocumentComparison  @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+  author         User                @relation(fields: [authorId], references: [id])
+  
+  @@map("comments")
+}
+
+// Review and Approval System
+model Review {
+  id           String       @id @default(cuid())
+  conversionId String
+  reviewerId   String
+  status       ReviewStatus @default(PENDING)
+  feedback     String?      @db.Text
+  
+  assignedAt   DateTime     @default(now())
+  completedAt  DateTime?
+  dueDate      DateTime?
+  
+  // Relations
+  conversion   Conversion   @relation(fields: [conversionId], references: [id], onDelete: Cascade)
+  reviewer     User         @relation(fields: [reviewerId], references: [id])
+  
+  @@map("reviews")
+}
+
+enum ReviewStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  NEEDS_REVISION
+}
+
+// Change Management
+model ChangeRequest {
+  id             String              @id @default(cuid())
+  title          String
+  description    String              @db.Text
+  type           ChangeType
+  priority       Priority            @default(MEDIUM)
+  status         ChangeRequestStatus @default(SUBMITTED)
+  
+  // Impact Analysis
+  impactAnalysis String?            @db.Text
+  affectedItems  String?            @db.Text // JSON array of affected templates/mappings
+  
+  requestedById  String
+  assignedToId   String?
+  approvedById   String?
+  
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  approvedAt     DateTime?
+  implementedAt  DateTime?
+  
+  // Relations
+  requestedBy    User               @relation(fields: [requestedById], references: [id])
+  
+  @@map("change_requests")
+}
+
+enum ChangeType {
+  TEMPLATE_UPDATE
+  MAPPING_CHANGE
+  SYSTEM_CONFIG
+  NEW_FEATURE
+  BUG_FIX
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ChangeRequestStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// Audit and Monitoring
+model AuditLog {
+  id          String    @id @default(cuid())
+  userId      String
+  action      String    // CREATE, UPDATE, DELETE, etc.
+  entityType  String    // template, mapping, conversion, etc.
+  entityId    String
+  oldValues   String?   @db.LongText // JSON
+  newValues   String?   @db.LongText // JSON
+  ipAddress   String?
+  userAgent   String?   @db.Text
+  
+  createdAt   DateTime  @default(now())
+  
+  // Relations
+  user        User      @relation(fields: [userId], references: [id])
+  
+  @@map("audit_logs")
+}
+
+// Analytics and Reporting
+model SystemMetrics {
+  id                    String   @id @default(cuid())
+  date                  DateTime @default(now()) @db.Date
+  
+  // Template Metrics
+  totalTemplates        Int      @default(0)
+  templatesProcessed    Int      @default(0)
+  templatesWithErrors   Int      @default(0)
+  
+  // AI Processing Metrics
+  aiRequestsCount       Int      @default(0)
+  aiSuccessRate         Float    @default(0)
+  averageConfidence     Float    @default(0)
+  averageProcessingTime Float    @default(0)
+  
+  // Conversion Metrics
+  conversionsCount      Int      @default(0)
+  conversionSuccessRate Float    @default(0)
+  averageMappingRate    Float    @default(0)
+  
+  // User Activity
+  activeUsers           Int      @default(0)
+  totalReviews          Int      @default(0)
+  pendingReviews        Int      @default(0)
+  
+  createdAt             DateTime @default(now())
+  
+  @@unique([date])
+  @@map("system_metrics")
+}
