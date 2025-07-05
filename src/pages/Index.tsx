@@ -18,18 +18,56 @@ const Index = () => {
     switch (location.pathname) {
       case '/upload':
         return <TemplateUpload />;
+      case '/library':
+        return <TemplateUpload />; // Reuse for now
+      case '/versions':
+        return <DashboardHome />; // Placeholder
       case '/ai-config':
         return <AIConfiguration />;
+      case '/tag-extraction':
+        return <AIConfiguration />; // Related functionality
+      case '/batch-processing':
+        return <ConversionDashboard />; // Related functionality
       case '/tags':
         return <TagManager />;
       case '/tag-mapping':
         return <TagMappingInterface />;
+      case '/tag-analytics':
+        return <DashboardHome />; // Placeholder
       case '/conversion':
         return <ConversionDashboard />;
       case '/compare':
         return <DocumentComparison />;
+      case '/conversion-templates':
+        return <TemplateUpload />; // Related functionality
       case '/review':
         return <ReviewWorkflow />;
+      case '/review-history':
+        return <ReviewWorkflow />; // Related functionality
+      case '/workflow-config':
+        return <ReviewWorkflow />; // Related functionality
+      case '/change-requests':
+        return <DashboardHome />; // Placeholder
+      case '/impact-analysis':
+        return <DashboardHome />; // Placeholder
+      case '/deployment':
+        return <DashboardHome />; // Placeholder
+      case '/analytics':
+        return <DashboardHome />; // Already has analytics
+      case '/usage-stats':
+        return <DashboardHome />; // Related functionality
+      case '/ai-performance':
+        return <AIConfiguration />; // Related functionality
+      case '/users':
+        return <DashboardHome />; // Placeholder
+      case '/permissions':
+        return <DashboardHome />; // Placeholder
+      case '/audit-logs':
+        return <DashboardHome />; // Placeholder
+      case '/settings':
+        return <AIConfiguration />; // Related functionality
+      case '/notifications':
+        return <DashboardHome />; // Placeholder
       default:
         return <DashboardHome />;
     }
