@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Sidebar } from "@/components/Sidebar";
 import { DashboardHome } from "@/components/DashboardHome";
 import { TemplateUpload } from "@/components/TemplateUpload";
+import { TemplateGrid } from "@/components/TemplateGrid";
 import { AIConfiguration } from "@/components/AIConfiguration";
 import { TagManager } from "@/components/TagManager";
 import { TagMappingInterface } from "@/components/TagMappingInterface";
@@ -19,7 +20,12 @@ const Index = () => {
   const renderContent = () => {
     switch (location.pathname) {
       case '/upload':
-        return <TemplateUpload />;
+        return (
+          <div className="space-y-8">
+            <TemplateUpload />
+            <TemplateGrid />
+          </div>
+        );
       case '/library':
         return <TemplateUpload />; // Reuse for now
       case '/versions':

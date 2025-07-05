@@ -244,7 +244,7 @@ export const TagMappingInterface = () => {
                   <SelectItem value="all">All Templates ({sourceTags.length} tags)</SelectItem>
                   {templates.map(template => (
                     <SelectItem key={template.id} value={template.id}>
-                      {template.name} ({template._count?.extractedTags || 0} tags)
+                      {template.name} (tags available)
                     </SelectItem>
                   ))}
                 </SelectContent>

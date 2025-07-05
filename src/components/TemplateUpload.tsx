@@ -58,27 +58,31 @@ export const TemplateUpload = () => {
           f.id === uploadedFile.id ? { ...f, status: 'uploading', progress: 30 } : f
         ));
 
-        // Process the file (API integration needed)
-        setFiles(prev => prev.map(f => 
-          f.id === uploadedFile.id ? { ...f, status: 'processing', progress: 50 } : f
-        ));
+        // Save template to database
+        const result = await uploadTemplate({
+          name: file.name,
+          file_size: file.size,
+          file_type: file.type,
+          tags: ['uploaded']
+        });
 
-        // TODO: Implement actual file processing
-        // For now, mark as completed after a short delay
-        setTimeout(() => {
-          setFiles(prev => prev.map(f => 
-            f.id === uploadedFile.id ? {
-              ...f,
-              status: 'completed',
-              progress: 100
-            } : f
-          ));
-          
-          toast({
-            title: "Upload completed",
-            description: `${file.name} has been uploaded (processing will be implemented).`
-          });
-        }, 2000);
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
+        setFiles(prev => prev.map(f => 
+          f.id === uploadedFile.id ? {
+            ...f,
+            status: 'completed',
+            progress: 100,
+            tags: ['uploaded', 'processed']
+          } : f
+        ));
+        
+        toast({
+          title: "Upload successful",
+          description: `${file.name} has been uploaded and saved.`
+        });
 
       } catch (err) {
         setFiles(prev => prev.map(f => 

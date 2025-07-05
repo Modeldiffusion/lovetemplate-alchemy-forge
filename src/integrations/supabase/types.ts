@@ -39,6 +39,48 @@ export type Database = {
         }
         Relationships: []
       }
+      templates: {
+        Row: {
+          file_path: string | null
+          file_size: number | null
+          file_type: string | null
+          id: string
+          metadata: Json | null
+          name: string
+          status: string
+          tags: string[] | null
+          updated_at: string
+          uploaded_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          file_path?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          metadata?: Json | null
+          name: string
+          status?: string
+          tags?: string[] | null
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          file_path?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          metadata?: Json | null
+          name?: string
+          status?: string
+          tags?: string[] | null
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
