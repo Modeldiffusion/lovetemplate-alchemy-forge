@@ -15,8 +15,23 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log('Edge function called with method:', req.method);
+  console.log('Headers:', Object.fromEntries(req.headers.entries()));
+
   try {
-    const { templateId } = await req.json();
+    const requestBody = await req.text();
+    console.log('Raw request body:', requestBody);
+    
+    let parsedBody;
+    try {
+      parsedBody = JSON.parse(requestBody);
+      console.log('Parsed body:', parsedBody);
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      throw new Error('Invalid JSON in request body');
+    }
+
+    const { templateId } = parsedBody;
     console.log('Starting tag extraction for template:', templateId);
 
     if (!templateId) {
@@ -26,6 +41,7 @@ serve(async (req) => {
 
     if (!openAIApiKey) {
       console.error('OpenAI API key not found in environment');
+      console.log('Available env vars:', Object.keys(Deno.env.toObject()));
       throw new Error('OpenAI API key not configured');
     }
 
