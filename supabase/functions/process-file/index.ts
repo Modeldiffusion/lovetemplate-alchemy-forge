@@ -12,6 +12,46 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 );
 
+// Function to extract text from DOCX files
+async function extractTextFromDocx(bytes: Uint8Array): Promise<string> {
+  try {
+    // Import JSZip for ZIP file handling
+    const JSZip = (await import('https://esm.sh/jszip@3.7.1')).default;
+    
+    // Load the DOCX file as a ZIP archive
+    const zip = await JSZip.loadAsync(bytes);
+    
+    // Get the main document XML file
+    const documentXml = zip.file('word/document.xml');
+    if (!documentXml) {
+      throw new Error('Could not find document.xml in DOCX file');
+    }
+    
+    // Read the XML content
+    const xmlContent = await documentXml.async('string');
+    
+    // Extract text from XML tags (simplified approach)
+    // Remove XML tags and extract text content
+    let textContent = xmlContent
+      .replace(/<[^>]*>/g, ' ')  // Remove XML tags
+      .replace(/\s+/g, ' ')      // Normalize whitespace
+      .trim();
+    
+    // Clean up common Word XML artifacts
+    textContent = textContent
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'");
+    
+    return textContent;
+  } catch (error) {
+    console.error('Error extracting text from DOCX:', error);
+    throw error;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -46,10 +86,35 @@ serve(async (req) => {
       } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
                  fileType === 'application/msword' ||
                  fileType.includes('word')) {
-        // For Word documents, store a simple message
-        console.log('Word document detected - storing basic info');
-        extractedText = `Word document uploaded successfully. File ready for tag extraction.`;
-        contentToStore = extractedText;
+        // For Word documents, attempt to extract text content
+        console.log('Word document detected - attempting text extraction');
+        try {
+          // Decode base64 to get binary data
+          const binaryString = atob(fileContent);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          
+          // DOCX files are ZIP archives - try to extract text from document.xml
+          // This is a simplified extraction - for production use a proper library
+          const textContent = await extractTextFromDocx(bytes);
+          
+          if (textContent && textContent.length > 10) {
+            extractedText = textContent;
+            contentToStore = textContent;
+            console.log(`Extracted ${textContent.length} characters from DOCX`);
+          } else {
+            // Fallback - store the base64 content for manual processing
+            extractedText = `DOCX document content (${bytes.length} bytes)`;
+            contentToStore = fileContent; // Store original base64
+            console.log('Could not extract text, storing original content');
+          }
+        } catch (error) {
+          console.error('DOCX processing error:', error);
+          extractedText = `DOCX document uploaded (processing error: ${error.message})`;
+          contentToStore = fileContent;
+        }
       } else if (fileType === 'application/pdf') {
         // For PDF documents, store a simple message
         console.log('PDF document detected - storing basic info');
