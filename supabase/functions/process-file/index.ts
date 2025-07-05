@@ -30,40 +30,61 @@ serve(async (req) => {
     console.log(`Processing file for template ${templateId}, type: ${fileType}`);
 
     let extractedText = '';
+    let contentToStore = fileContent; // Store base64 by default
     
     try {
-      // For now, handle base64 encoded text content
-      // In the future, this can be extended to handle different file formats
-      if (fileType === 'text/plain' || fileType === 'application/octet-stream') {
-        // Assume base64 encoded text
+      // Handle different file formats
+      if (fileType === 'text/plain') {
+        // For plain text files, decode base64 to get actual text
         try {
           extractedText = atob(fileContent);
+          contentToStore = extractedText;
         } catch {
-          // If not base64, treat as plain text
           extractedText = fileContent;
+          contentToStore = fileContent;
         }
+      } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+                 fileType === 'application/msword' ||
+                 fileType.includes('word')) {
+        // For Word documents (.docx, .doc), store base64 for now
+        // TODO: Implement proper document parsing using libraries like docx or mammoth
+        console.log('Word document detected - storing as base64 for future processing');
+        contentToStore = fileContent;
+        extractedText = `[Word Document: ${fileType}] - Content stored as base64. Proper document parsing needed for text extraction.`;
+      } else if (fileType === 'application/pdf') {
+        // For PDF documents, store base64 for now
+        // TODO: Implement proper PDF text extraction
+        console.log('PDF document detected - storing as base64 for future processing');
+        contentToStore = fileContent;
+        extractedText = `[PDF Document] - Content stored as base64. Proper PDF parsing needed for text extraction.`;
       } else {
-        // For other formats, we'll need to implement specific parsers
-        // For now, treat as text
+        // For other formats, try to decode as text if possible
         try {
           extractedText = atob(fileContent);
+          contentToStore = extractedText;
         } catch {
+          // If not base64, store as-is
           extractedText = fileContent;
+          contentToStore = fileContent;
         }
       }
 
-      console.log(`Extracted text length: ${extractedText.length}`);
+      console.log(`File type: ${fileType}`);
+      console.log(`Extracted text preview: ${extractedText.substring(0, 100)}...`);
+      console.log(`Content storage type: ${typeof contentToStore}`);
       
       // Update template with extracted content
       const { error: updateError } = await supabase
         .from('templates')
         .update({ 
           metadata: { 
-            content: extractedText,
+            content: contentToStore,
+            extractedText: extractedText,
             processedAt: new Date().toISOString(),
-            originalFileType: fileType
+            originalFileType: fileType,
+            needsDocumentParsing: fileType.includes('word') || fileType.includes('pdf')
           },
-          status: 'completed'
+          status: 'processed'
         })
         .eq('id', templateId);
 

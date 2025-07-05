@@ -96,8 +96,22 @@ serve(async (req) => {
     
     // Check if template has actual content in metadata
     if (template.metadata && template.metadata.content) {
-      templateContent = template.metadata.content;
+      // Check if this is a document that needs proper parsing
+      if (template.metadata.needsDocumentParsing) {
+        console.error('❌ Document requires proper parsing');
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Document type ${template.metadata.originalFileType} requires proper parsing. Current extraction from binary documents is not supported. Please convert to plain text or implement document parsing.` 
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Use extracted text if available, otherwise use content
+      templateContent = template.metadata.extractedText || template.metadata.content;
       console.log('Using actual content from metadata, length:', templateContent.length);
+      console.log('Content preview:', templateContent.substring(0, 200));
     } else if (template.file_path) {
       console.log('File path exists:', template.file_path);
       // TODO: Read from Supabase Storage when implemented
@@ -126,7 +140,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'No template content available. Please re-upload the template with content storage enabled.' 
+          error: 'No template content available. Please re-upload the template to store content properly.' 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

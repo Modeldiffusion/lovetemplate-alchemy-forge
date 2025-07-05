@@ -27,21 +27,22 @@ export const TemplateUpload = () => {
   const { templates, uploadTemplate, loading, error } = useTemplates();
   const { toast } = useToast();
 
-  // Helper function to read file content
+  // Helper function to read file content as base64
   const readFileContent = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
         if (reader.result) {
-          // Convert to base64 for transmission
-          const base64 = btoa(reader.result as string);
+          // Get the base64 string (remove the data URL prefix)
+          const base64 = (reader.result as string).split(',')[1];
           resolve(base64);
         } else {
           reject(new Error('Failed to read file'));
         }
       };
       reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsText(file);
+      // Read as data URL to get proper base64 encoding for binary files
+      reader.readAsDataURL(file);
     });
   };
 
