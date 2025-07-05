@@ -57,24 +57,12 @@ export class TagExtractor {
   static extractTags(templateContent: string, config: ExtractionConfig): ExtractedTagResult[] {
     console.log('Step 6: Building extraction regex...');
     
-    // Default delimiter configuration - support multiple common delimiter types
-    const defaultConfig: ExtractionConfig = {
-      delimiterPairs: [
-        { start: '[', end: ']' },           // Square brackets
-        { start: '«', end: '»' },           // Guillemets
-        { start: '<<', end: '>>' },         // Double angle brackets  
-        { start: '<', end: '>' },           // Single angle brackets
-        { start: '{', end: '}' },           // Curly braces
-        { start: '{{', end: '}}' },         // Double curly braces
-        { start: '(', end: ')' },           // Parentheses
-        { start: '__', end: '__' },         // Double underscores
-        { start: '**', end: '**' }          // Double asterisks
-      ],
-      caseSensitive: false,
-      includeDelimiters: true
+    // Use user-provided config, with minimal defaults only if needed
+    const finalConfig: ExtractionConfig = {
+      delimiterPairs: config?.delimiterPairs || [{ start: '[', end: ']' }],
+      caseSensitive: config?.caseSensitive ?? false,
+      includeDelimiters: config?.includeDelimiters ?? true
     };
-    
-    const finalConfig = { ...defaultConfig, ...config };
     console.log('Using extraction config:', finalConfig);
     
     const tagRegex = this.buildExtractionRegex(finalConfig.delimiterPairs, finalConfig.caseSensitive);
