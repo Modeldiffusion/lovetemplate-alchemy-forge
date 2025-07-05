@@ -50,10 +50,11 @@ const menuItems: MenuItem[] = [
   },
   {
     id: "templates",
-    label: "Template Management",
+    label: "Processing",
     icon: FileText,
     children: [
       { id: "upload", label: "Upload Templates", icon: Upload, path: "/upload" },
+      { id: "extraction", label: "Extract Tags", icon: Target, path: "/extraction" },
       { id: "library", label: "Template Library", icon: Archive, path: "/library" },
       { id: "versions", label: "Version Control", icon: GitBranch, path: "/versions" },
     ]

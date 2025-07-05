@@ -11,6 +11,8 @@ import { TagMappingInterface } from "@/components/TagMappingInterface";
 import { ConversionDashboard } from "@/components/ConversionDashboard";
 import { DocumentComparison } from "@/components/DocumentComparison";
 import { ReviewWorkflow } from "@/components/ReviewWorkflow";
+import { TemplateExtractionGrid } from "@/components/TemplateExtractionGrid";
+import { TemplateExtractionForm } from "@/components/TemplateExtractionForm";
 
 const Index = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -18,7 +20,14 @@ const Index = () => {
   const { user, signOut } = useAuth();
 
   const renderContent = () => {
-    switch (location.pathname) {
+    const path = location.pathname;
+    
+    // Handle dynamic routes first
+    if (path.startsWith('/extraction/') && path !== '/extraction') {
+      return <TemplateExtractionForm />;
+    }
+    
+    switch (path) {
       case '/upload':
         return (
           <div className="space-y-8">
@@ -26,6 +35,8 @@ const Index = () => {
             <TemplateGrid />
           </div>
         );
+      case '/extraction':
+        return <TemplateExtractionGrid />;
       case '/library':
         return <TemplateUpload />; // Reuse for now
       case '/versions':
