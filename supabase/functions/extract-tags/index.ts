@@ -17,14 +17,19 @@ serve(async (req) => {
 
   try {
     const { templateId } = await req.json();
+    console.log('Starting tag extraction for template:', templateId);
 
     if (!templateId) {
+      console.error('No template ID provided');
       throw new Error('Template ID is required');
     }
 
     if (!openAIApiKey) {
+      console.error('OpenAI API key not found in environment');
       throw new Error('OpenAI API key not configured');
     }
+
+    console.log('OpenAI API key found, proceeding with extraction');
 
     // Initialize Supabase client
     const supabaseClient = createClient(
@@ -37,6 +42,8 @@ serve(async (req) => {
       }
     );
 
+    console.log('Supabase client initialized, fetching template...');
+
     // Get template details
     const { data: template, error: templateError } = await supabaseClient
       .from('templates')
@@ -44,9 +51,17 @@ serve(async (req) => {
       .eq('id', templateId)
       .single();
 
-    if (templateError || !template) {
+    if (templateError) {
+      console.error('Template fetch error:', templateError);
+      throw new Error(`Template fetch failed: ${templateError.message}`);
+    }
+
+    if (!template) {
+      console.error('Template not found with ID:', templateId);
       throw new Error('Template not found');
     }
+
+    console.log('Template found:', template.name);
 
     // Simulate template content extraction (in real implementation, you'd extract from file)
     const templateContent = `Template: ${template.name}
@@ -58,6 +73,8 @@ serve(async (req) => {
     Department: [DEPARTMENT]
     Description: [DESCRIPTION]
     Notes: [ADDITIONAL_NOTES]`;
+
+    console.log('Calling OpenAI API...');
 
     // Use OpenAI to extract tags
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -100,13 +117,27 @@ Only extract actual template tags/placeholders, not regular text.`
       }),
     });
 
+    console.log('OpenAI API response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`OpenAI API failed: ${response.status} ${errorText}`);
+    }
+
     const aiData = await response.json();
+    console.log('OpenAI API response received');
+    
     const extractedTagsText = aiData.choices[0].message.content;
+    
+    console.log('Parsing extracted tags...');
     
     let extractedTags;
     try {
       extractedTags = JSON.parse(extractedTagsText);
+      console.log('Successfully parsed', extractedTags.length, 'tags');
     } catch (parseError) {
+      console.log('Failed to parse AI response, using fallback tags');
       // Fallback parsing if AI doesn't return perfect JSON
       extractedTags = [
         { text: "COMPANY_NAME", confidence: 90, context: "Company: [COMPANY_NAME]", position: 1, pattern: "Company name placeholder" },
@@ -119,8 +150,17 @@ Only extract actual template tags/placeholders, not regular text.`
       ];
     }
 
+    console.log('Getting user context for database insert...');
+    
     // Store extracted tags in database
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    
+    if (userError) {
+      console.error('User auth error:', userError);
+      throw new Error(`Authentication failed: ${userError.message}`);
+    }
+    
+    console.log('User authenticated:', user?.id);
     
     const tagsToInsert = extractedTags.map((tag: any) => ({
       template_id: templateId,
@@ -132,20 +172,32 @@ Only extract actual template tags/placeholders, not regular text.`
       extracted_by: user?.id
     }));
 
+    console.log('Inserting', tagsToInsert.length, 'tags into database...');
+
     const { data: insertedTags, error: insertError } = await supabaseClient
       .from('extracted_tags')
       .insert(tagsToInsert)
       .select();
 
     if (insertError) {
+      console.error('Database insert error:', insertError);
       throw new Error(`Failed to store extracted tags: ${insertError.message}`);
     }
 
+    console.log('Successfully inserted tags, updating template status...');
+
     // Update template status
-    await supabaseClient
+    const { error: updateError } = await supabaseClient
       .from('templates')
       .update({ status: 'completed' })
       .eq('id', templateId);
+      
+    if (updateError) {
+      console.error('Template update error:', updateError);
+      // Don't throw here as the main operation succeeded
+    }
+
+    console.log('Tag extraction completed successfully');
 
     return new Response(
       JSON.stringify({
