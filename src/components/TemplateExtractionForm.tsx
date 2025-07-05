@@ -11,6 +11,7 @@ import { ArrowLeft, FileText, Target, AlertCircle } from "lucide-react";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export const TemplateExtractionForm = () => {
   const { templateId } = useParams();
@@ -42,6 +43,22 @@ export const TemplateExtractionForm = () => {
     }
 
     try {
+      // Test the connection first
+      console.log('Testing edge function connection...');
+      const { data: testData, error: testError } = await supabase.functions.invoke('test-extract', {
+        body: { test: true, templateId: targetTemplates[0].id }
+      });
+
+      if (testError) {
+        console.error('Test function error:', testError);
+        toast.error(`Connection test failed: ${testError.message}`);
+        return;
+      }
+
+      console.log('Test function response:', testData);
+      toast.success('Connection test successful! Now trying actual extraction...');
+
+      // Now try the actual extraction
       for (const template of targetTemplates) {
         await extractTags(template.id);
         toast.success(`Tags extracted from ${template.name}`);
@@ -53,6 +70,7 @@ export const TemplateExtractionForm = () => {
       
       navigate('/tag-mapping');
     } catch (error) {
+      console.error('Extraction error:', error);
       toast.error(error instanceof Error ? error.message : 'Extraction failed');
     }
   };
