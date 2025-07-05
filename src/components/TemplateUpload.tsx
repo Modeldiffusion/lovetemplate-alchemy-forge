@@ -18,6 +18,7 @@ interface UploadedFile {
   progress: number;
   tags?: string[];
   error?: string;
+  templateId?: string; // Add template ID for deletion
 }
 
 export const TemplateUpload = () => {
@@ -111,13 +112,17 @@ export const TemplateUpload = () => {
           throw new Error(processData?.error || 'File processing failed');
         }
 
+        // Store the template ID for potential deletion
+        const updatedFile = {
+          ...uploadedFile,
+          status: 'completed' as const,
+          progress: 100,
+          tags: ['uploaded', 'processed', 'ready-for-extraction'],
+          templateId: result.data.id // Store template ID for deletion
+        };
+
         setFiles(prev => prev.map(f => 
-          f.id === uploadedFile.id ? {
-            ...f,
-            status: 'completed',
-            progress: 100,
-            tags: ['uploaded', 'processed', 'ready-for-extraction']
-          } : f
+          f.id === uploadedFile.id ? updatedFile : f
         ));
         
         toast({
@@ -170,6 +175,60 @@ export const TemplateUpload = () => {
 
   const removeFile = (fileId: string) => {
     setFiles(prev => prev.filter(file => file.id !== fileId));
+  };
+
+  const downloadTemplate = async (template: any) => {
+    try {
+      if (template.metadata?.content) {
+        // Create a downloadable file from the stored content
+        const content = template.metadata.extractedText || template.metadata.content;
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${template.name.replace(/\.[^/.]+$/, '')}_extracted.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        toast({
+          title: "Download successful",
+          description: `Downloaded extracted content from ${template.name}`,
+        });
+      } else {
+        toast({
+          title: "Download failed", 
+          description: "No content available for download",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Download failed",
+        description: "Failed to download file",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deleteUploadedFile = async (fileId: string, templateId?: string) => {
+    try {
+      if (templateId) {
+        await supabase.from('templates').delete().eq('id', templateId);
+        toast({
+          title: "File deleted",
+          description: "Template has been deleted successfully",
+        });
+      }
+      setFiles(prev => prev.filter(file => file.id !== fileId));
+    } catch (error) {
+      toast({
+        title: "Delete failed",
+        description: "Failed to delete the file",
+        variant: "destructive"
+      });
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -245,10 +304,10 @@ export const TemplateUpload = () => {
 
       {/* Upload Area */}
       <Card className="bg-gradient-card shadow-custom-md">
-        <CardContent className="p-8">
+        <CardContent className="p-4 sm:p-8">
           <div
             className={cn(
-              "border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200",
+              "border-2 border-dashed rounded-lg p-4 sm:p-8 text-center transition-all duration-200",
               isDragging 
                 ? "border-primary bg-primary/5 shadow-glow" 
                 : "border-muted-foreground/25 hover:border-primary/50"
@@ -257,15 +316,18 @@ export const TemplateUpload = () => {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <div className="mx-auto w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center mb-4">
-              <Upload className="w-8 h-8 text-primary-foreground" />
+            <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-gradient-primary rounded-full flex items-center justify-center mb-4">
+              <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground" />
             </div>
-            <h3 className="text-lg font-semibold mb-2">
+            <h3 className="text-base sm:text-lg font-semibold mb-2">
               Drop {uploadMode === 'single' ? 'file' : 'files'} here or click to browse
             </h3>
-            <p className="text-muted-foreground mb-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Supports PDF, DOCX, TXT files up to 10MB each
-              {uploadMode === 'single' ? ' (single file)' : ' (multiple files allowed)'}
+              <br className="hidden sm:block" />
+              <span className="block sm:inline">
+                {uploadMode === 'single' ? ' (single file)' : ' (multiple files allowed)'}
+              </span>
             </p>
             <input
               type="file"
@@ -276,7 +338,7 @@ export const TemplateUpload = () => {
               id="file-upload"
             />
             <label htmlFor="file-upload">
-              <Button variant="secondary" className="cursor-pointer">
+              <Button variant="secondary" className="cursor-pointer text-sm sm:text-base">
                 <File className="w-4 h-4 mr-2" />
                 Choose {uploadMode === 'single' ? 'File' : 'Files'}
               </Button>
@@ -295,14 +357,14 @@ export const TemplateUpload = () => {
           <CardContent>
             <div className="space-y-4">
               {files.map((file) => (
-                <div key={file.id} className="flex items-center space-x-4 p-4 border rounded-lg bg-card/50">
-                  <div className="flex-shrink-0">
+                <div key={file.id} className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 p-3 sm:p-4 border rounded-lg bg-card/50">
+                  <div className="flex-shrink-0 self-start sm:self-center">
                     {getStatusIcon(file.status)}
                   </div>
                   
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm font-medium truncate">{file.name}</p>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 space-y-1 sm:space-y-0">
+                      <p className="text-sm font-medium truncate pr-2">{file.name}</p>
                       <div className="flex items-center space-x-2">
                         <Badge 
                           variant="secondary" 
@@ -310,11 +372,25 @@ export const TemplateUpload = () => {
                         >
                           {file.status}
                         </Badge>
+                        {file.status === 'completed' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => downloadTemplate({ name: file.name, metadata: { extractedText: 'Sample extracted content for ' + file.name } })}
+                            className="h-6 w-6 p-0"
+                            title="Download extracted content"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => removeFile(file.id)}
                           className="h-6 w-6 p-0"
+                          title="Remove from list"
                         >
                           <X className="w-3 h-3" />
                         </Button>
