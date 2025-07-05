@@ -176,34 +176,8 @@ export const DashboardHome = () => {
             <CardDescription>Latest template conversions and reviews</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[
-                { name: "Contract Template v2.1", status: "approved", time: "2 min ago", user: "John Smith" },
-                { name: "Invoice Format Update", status: "processing", time: "5 min ago", user: "Sarah Wilson" },
-                { name: "Policy Document Rev", status: "pending", time: "12 min ago", user: "Mike Johnson" },
-                { name: "User Manual Template", status: "approved", time: "1 hour ago", user: "Lisa Chen" },
-                { name: "Terms of Service Update", status: "failed", time: "2 hours ago", user: "David Brown" }
-              ].map((item, index) => (
-                <div key={index} className="flex items-center justify-between py-3 border-b last:border-b-0">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      by {item.user} • {item.time}
-                    </p>
-                  </div>
-                  <Badge 
-                    variant="secondary"
-                    className={
-                      item.status === "approved" ? "bg-success text-success-foreground" :
-                      item.status === "processing" ? "bg-status-processing text-white" :
-                      item.status === "failed" ? "bg-destructive text-destructive-foreground" :
-                      "bg-warning text-warning-foreground"
-                    }
-                  >
-                    {item.status}
-                  </Badge>
-                </div>
-              ))}
+            <div className="p-8 text-center text-muted-foreground">
+              <p>No recent activity to display</p>
             </div>
           </CardContent>
         </Card>
@@ -214,44 +188,8 @@ export const DashboardHome = () => {
             <CardDescription>Current AI model health and performance</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[
-                { provider: "OpenAI GPT-4", status: "active", health: "excellent", responseTime: "1.2s", usage: "89%" },
-                { provider: "Claude 3.5 Sonnet", status: "active", health: "good", responseTime: "0.8s", usage: "67%" },
-                { provider: "Gemini Pro", status: "standby", health: "good", responseTime: "2.1s", usage: "12%" },
-                { provider: "Custom Model", status: "maintenance", health: "poor", responseTime: "N/A", usage: "0%" }
-              ].map((item, index) => (
-                <div key={index} className="flex items-center justify-between py-3 border-b last:border-b-0">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-2 h-2 rounded-full ${
-                      item.status === 'active' ? 'bg-success' :
-                      item.status === 'standby' ? 'bg-warning' :
-                      'bg-destructive'
-                    }`} />
-                    <div>
-                      <p className="text-sm font-medium">{item.provider}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Health: {item.health} • Response: {item.responseTime}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <Badge 
-                      variant="outline"
-                      className={`text-xs ${
-                        item.status === 'active' ? 'border-success text-success' :
-                        item.status === 'standby' ? 'border-warning text-warning' :
-                        'border-destructive text-destructive'
-                      }`}
-                    >
-                      {item.status}
-                    </Badge>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Usage: {item.usage}
-                    </p>
-                  </div>
-                </div>
-              ))}
+            <div className="p-8 text-center text-muted-foreground">
+              <p>AI provider status will appear here when configured</p>
             </div>
           </CardContent>
         </Card>

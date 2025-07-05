@@ -36,21 +36,8 @@ export const TagManager = () => {
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [newTag, setNewTag] = useState({ name: "", category: "", description: "" });
 
-  // Mock data for tags
-  const [tags, setTags] = useState<TagItem[]>([
-    { id: "1", name: "contract", category: "legal", frequency: 156, confidence: 98, lastUsed: "2 hours ago", description: "Legal contract documents" },
-    { id: "2", name: "invoice", category: "financial", frequency: 203, confidence: 95, lastUsed: "5 minutes ago", mappedTo: ["bill", "receipt"] },
-    { id: "3", name: "policy", category: "hr", frequency: 89, confidence: 92, lastUsed: "1 day ago", description: "Human resources policies" },
-    { id: "4", name: "template", category: "general", frequency: 445, confidence: 99, lastUsed: "30 minutes ago" },
-    { id: "5", name: "agreement", category: "legal", frequency: 167, confidence: 94, lastUsed: "3 hours ago", mappedTo: ["contract", "terms"] },
-    { id: "6", name: "report", category: "business", frequency: 234, confidence: 96, lastUsed: "15 minutes ago" },
-  ]);
-
-  const [mappings, setMappings] = useState<TagMapping[]>([
-    { id: "1", sourceTag: "invoice", targetTags: ["bill", "receipt", "payment"], confidence: 95, rules: "Financial documents with amount due" },
-    { id: "2", sourceTag: "agreement", targetTags: ["contract", "terms", "conditions"], confidence: 88, rules: "Legal binding documents" },
-    { id: "3", sourceTag: "memo", targetTags: ["note", "communication", "internal"], confidence: 76, rules: "Internal communications" }
-  ]);
+  const [tags, setTags] = useState<TagItem[]>([]);
+  const [mappings, setMappings] = useState<TagMapping[]>([]);
 
   const categories = ["all", "legal", "financial", "hr", "business", "general"];
 

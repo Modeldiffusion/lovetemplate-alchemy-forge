@@ -62,65 +62,11 @@ export const DocumentComparison = () => {
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const rightPanelRef = useRef<HTMLDivElement>(null);
 
-  // Mock data
-  const [documents] = useState<Document[]>([
-    { id: "1", name: "Contract Template Original", type: "original", lastModified: "2 hours ago", size: "45KB", path: "/docs/contract_original.docx" },
-    { id: "2", name: "Contract Template Converted", type: "converted", lastModified: "1 hour ago", size: "47KB", path: "/docs/contract_converted.docx" },
-    { id: "3", name: "Invoice Format Original", type: "original", lastModified: "1 day ago", size: "23KB", path: "/docs/invoice_original.docx" },
-    { id: "4", name: "Invoice Format Converted", type: "converted", lastModified: "1 day ago", size: "24KB", path: "/docs/invoice_converted.docx" }
-  ]);
-
-  const [changes] = useState<DocumentChange[]>([
-    { id: "1", type: "modification", lineNumber: 12, content: "Client Name: {{client.name}}", oldContent: "Client Name: {{CLIENT_NAME}}", severity: "low" },
-    { id: "2", type: "addition", lineNumber: 18, content: "Effective Date: {{contract.effectiveDate}}", severity: "medium" },
-    { id: "3", type: "deletion", lineNumber: 25, content: "{{OLD_FIELD}}", severity: "high" },
-    { id: "4", type: "modification", lineNumber: 34, content: "Total Amount: {{amount.total}}", oldContent: "Total Amount: {{AMOUNT_DUE}}", severity: "medium" }
-  ]);
-
-  const [comments, setComments] = useState<Comment[]>([
-    { id: "1", lineNumber: 12, author: "John Smith", content: "This mapping looks correct for the new standard.", timestamp: "2 hours ago", resolved: false },
-    { id: "2", lineNumber: 25, author: "Sarah Wilson", content: "Why was this field removed? We might still need it.", timestamp: "1 hour ago", resolved: false }
-  ]);
-
-  // Mock document content with line numbers
-  const originalContent = `1  CONTRACT AGREEMENT
-2  
-3  This Agreement is made between {{CLIENT_NAME}} and our company.
-4  
-5  Terms and Conditions:
-6  1. Payment terms: {{PAYMENT_TERMS}}
-7  2. Contract duration: {{CONTRACT_DURATION}}
-8  3. Service description: {{SERVICE_DESC}}
-9  
-10 Financial Details:
-11 - Base amount: {{BASE_AMOUNT}}
-12 - Total due: {{AMOUNT_DUE}}
-13 
-14 Signatures:
-15 Client: ________________
-16 Company: _______________
-17 
-18 Date: {{CONTRACT_DATE}}`;
-
-  const convertedContent = `1  CONTRACT AGREEMENT
-2  
-3  This Agreement is made between {{client.name}} and our company.
-4  
-5  Terms and Conditions:
-6  1. Payment terms: {{contract.paymentTerms}}
-7  2. Contract duration: {{contract.duration}}
-8  3. Service description: {{service.description}}
-9  
-10 Financial Details:
-11 - Base amount: {{amount.base}}
-12 - Total due: {{amount.total}}
-13 
-14 Signatures:
-15 Client: ________________
-16 Company: _______________
-17 
-18 Effective Date: {{contract.effectiveDate}}
-19 Date: {{contract.date}}`;
+  const [documents] = useState<Document[]>([]);
+  const [changes] = useState<DocumentChange[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const originalContent = "";
+  const convertedContent = "";
 
   const getChangeTypeColor = (type: DocumentChange['type']) => {
     switch (type) {

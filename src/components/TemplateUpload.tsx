@@ -58,29 +58,27 @@ export const TemplateUpload = () => {
           f.id === uploadedFile.id ? { ...f, status: 'uploading', progress: 30 } : f
         ));
 
-        // Since API is not available, simulate the upload process
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
+        // Process the file (API integration needed)
         setFiles(prev => prev.map(f => 
-          f.id === uploadedFile.id ? { ...f, status: 'processing', progress: 70 } : f
+          f.id === uploadedFile.id ? { ...f, status: 'processing', progress: 50 } : f
         ));
 
-        // Simulate processing
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        setFiles(prev => prev.map(f => 
-          f.id === uploadedFile.id ? {
-            ...f,
-            status: 'completed',
-            progress: 100,
-            tags: ['ai-extracted', 'processed', 'template']
-          } : f
-        ));
-        
-        toast({
-          title: "Upload successful",
-          description: `${file.name} has been processed successfully.`
-        });
+        // TODO: Implement actual file processing
+        // For now, mark as completed after a short delay
+        setTimeout(() => {
+          setFiles(prev => prev.map(f => 
+            f.id === uploadedFile.id ? {
+              ...f,
+              status: 'completed',
+              progress: 100
+            } : f
+          ));
+          
+          toast({
+            title: "Upload completed",
+            description: `${file.name} has been uploaded (processing will be implemented).`
+          });
+        }, 2000);
 
       } catch (err) {
         setFiles(prev => prev.map(f => 
@@ -93,8 +91,9 @@ export const TemplateUpload = () => {
         ));
         
         toast({
-          title: "Upload simulated",
-          description: `${file.name} processing simulated (backend not connected)`,
+          title: "Upload failed",
+          description: `Failed to process ${file.name}. Please try again.`,
+          variant: "destructive"
         });
       }
     }
