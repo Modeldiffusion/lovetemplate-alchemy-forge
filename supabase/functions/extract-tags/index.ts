@@ -192,35 +192,35 @@ Contact: [CONTACT_PERSON]
 Email: [CONTACT_EMAIL]
         `;
       } else {
-        // Generic template
+        // Generic template with mixed delimiters for testing
         sampleContent = `
 ${template.name}
 
 Document Details:
 - Title: [DOCUMENT_TITLE]
-- Date: [DOCUMENT_DATE]
-- Reference: [REFERENCE_NUMBER]
+- Date: <<DOCUMENT_DATE>>
+- Reference: {REFERENCE_NUMBER}
 
 Client Information:
 - Name: [CLIENT_NAME]
-- Company: [COMPANY_NAME]
-- Email: [EMAIL_ADDRESS]
+- Company: <<COMPANY_NAME>>
+- Email: {EMAIL_ADDRESS}
 - Phone: [PHONE_NUMBER]
-- Address: [ADDRESS]
+- Address: <<ADDRESS>>
 
 Project Details:
 - Project: [PROJECT_NAME]
-- Description: [DESCRIPTION]
-- Value: [AMOUNT]
+- Description: <<DESCRIPTION>>
+- Value: {AMOUNT}
 - Status: [STATUS]
 
 Team:
-- Manager: [MANAGER_NAME]
-- Contact: [CONTACT_PERSON]
+- Manager: <<MANAGER_NAME>>
+- Contact: {CONTACT_PERSON}
 
 Notes: [ADDITIONAL_NOTES]
-Signature: [SIGNATURE]
-Date: [SIGNATURE_DATE]
+Signature: <<SIGNATURE>>
+Date: {SIGNATURE_DATE}
         `;
       }
       
@@ -235,8 +235,7 @@ Date: [SIGNATURE_DATE]
     
     // Default delimiter configuration
     const defaultConfig = {
-      startDelimiters: ['['],
-      endDelimiters: [']'],
+      delimiterPairs: [{ start: '[', end: ']' }],
       caseSensitive: false,
       includeDelimiters: true
     };
@@ -244,41 +243,46 @@ Date: [SIGNATURE_DATE]
     const config = { ...defaultConfig, ...extractionConfig };
     console.log('Using extraction config:', config);
     
-    // Build regex pattern for multiple delimiter combinations
-    const buildExtractionRegex = (startDelims, endDelims, caseSensitive) => {
-      // Escape special regex characters
-      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Build regex pattern for delimiter pairs
+    const buildExtractionRegex = (delimiterPairs, caseSensitive) => {
+      // Escape special regex characters properly
+      const escapeRegex = (str) => {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      };
       
-      // Build start delimiter pattern
-      const startPattern = startDelims.map(escapeRegex).join('|');
+      // Create patterns for each delimiter pair
+      const pairPatterns = delimiterPairs
+        .filter(pair => pair.start && pair.end)
+        .map(pair => {
+          const startEscaped = escapeRegex(pair.start);
+          const endEscaped = pair.end === ' ' ? '\\s+' : escapeRegex(pair.end);
+          
+          // Each pair captures: (start_delimiter)(tag_content)(end_delimiter)
+          return `(${startEscaped})([A-Z_][A-Z0-9_]*)(${endEscaped})`;
+        });
       
-      // Build end delimiter pattern
-      const endPattern = endDelims.map(delim => {
-        if (delim === ' ') {
-          return '\\s+'; // Match one or more whitespace characters
-        }
-        return escapeRegex(delim);
-      }).join('|');
+      if (pairPatterns.length === 0) {
+        // Fallback to default if no valid pairs
+        return /(\\[)([A-Z_][A-Z0-9_]*)(\\])/gi;
+      }
       
-      // Build the main pattern
-      // Capture: (start_delimiter)(tag_content)(end_delimiter)
-      const pattern = `(${startPattern})([A-Z_][A-Z0-9_]*)(${endPattern})`;
-      
+      // Combine all pair patterns with OR
+      const combinedPattern = pairPatterns.join('|');
       const flags = caseSensitive ? 'g' : 'gi';
-      return new RegExp(pattern, flags);
+      
+      return new RegExp(combinedPattern, flags);
     };
     
-    const tagRegex = buildExtractionRegex(
-      config.startDelimiters, 
-      config.endDelimiters, 
-      config.caseSensitive
-    );
+    const tagRegex = buildExtractionRegex(config.delimiterPairs, config.caseSensitive);
     
     console.log('Generated regex:', tagRegex);
     const extractedTags = [];
     const seenTags = new Set();
-    let match;
     let position = 1;
+
+    // Reset regex lastIndex to ensure we scan from the beginning
+    tagRegex.lastIndex = 0;
+    let match;
 
     while ((match = tagRegex.exec(templateContent)) !== null) {
       const fullMatch = match[0]; // Full match including delimiters
