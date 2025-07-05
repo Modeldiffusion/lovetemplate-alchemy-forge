@@ -238,7 +238,8 @@ Date: [SIGNATURE_DATE]
     let position = 1;
 
     while ((match = tagRegex.exec(templateContent)) !== null) {
-      const tagText = match[1];
+      const tagText = match[0]; // Full match including delimiters [TAG_NAME]
+      const tagContent = match[1]; // Just the content inside delimiters
       
       // Skip if we've already seen this tag
       if (seenTags.has(tagText)) {
@@ -251,32 +252,32 @@ Date: [SIGNATURE_DATE]
       const end = Math.min(templateContent.length, match.index + match[0].length + 30);
       const context = templateContent.substring(start, end).trim();
 
-      // Determine pattern/category based on tag name
+      // Determine pattern/category based on tag content
       let pattern = 'General placeholder';
       let confidence = 85;
 
-      if (tagText.includes('DATE')) {
+      if (tagContent.includes('DATE')) {
         pattern = 'Date placeholder';
         confidence = 95;
-      } else if (tagText.includes('NAME')) {
+      } else if (tagContent.includes('NAME')) {
         pattern = 'Name placeholder';
         confidence = 90;
-      } else if (tagText.includes('EMAIL')) {
+      } else if (tagContent.includes('EMAIL')) {
         pattern = 'Email placeholder';
         confidence = 95;
-      } else if (tagText.includes('PHONE')) {
+      } else if (tagContent.includes('PHONE')) {
         pattern = 'Phone placeholder';
         confidence = 90;
-      } else if (tagText.includes('ADDRESS')) {
+      } else if (tagContent.includes('ADDRESS')) {
         pattern = 'Address placeholder';
         confidence = 90;
-      } else if (tagText.includes('VALUE') || tagText.includes('AMOUNT')) {
+      } else if (tagContent.includes('VALUE') || tagContent.includes('AMOUNT')) {
         pattern = 'Currency/Value placeholder';
         confidence = 90;
-      } else if (tagText.includes('NUMBER')) {
+      } else if (tagContent.includes('NUMBER')) {
         pattern = 'Number placeholder';
         confidence = 85;
-      } else if (tagText.includes('COMPANY')) {
+      } else if (tagContent.includes('COMPANY')) {
         pattern = 'Company information placeholder';
         confidence = 95;
       }
