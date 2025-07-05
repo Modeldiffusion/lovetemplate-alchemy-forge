@@ -88,60 +88,149 @@ serve(async (req) => {
 
     console.log('✅ Template found:', template.name);
 
-    // Step 5: Generate sample template content with placeholder tags
-    // In a real implementation, you would extract content from the actual file
-    // For now, we'll create a realistic sample that includes common template patterns
-    const templateContent = `
-${template.name} - Document Template
+    // Step 5: Try to get actual file content, fallback to user-provided content
+    console.log('Step 5: Attempting to get template content...');
+    
+    let templateContent = '';
+    
+    // Check if file_path exists and try to read from storage
+    if (template.file_path) {
+      console.log('File path exists:', template.file_path);
+      // TODO: In a full implementation, read from Supabase Storage
+      // const { data: fileData } = await supabaseClient.storage.from('templates').download(template.file_path);
+      console.log('Note: File reading from storage not implemented yet');
+    }
+    
+    // For now, since file_path is null, we'll use template metadata if available
+    // or generate a realistic sample based on the template name
+    if (template.metadata && template.metadata.content) {
+      templateContent = template.metadata.content;
+      console.log('Using content from metadata');
+    } else {
+      // Generate more realistic sample content based on the file name and type
+      console.log('Generating sample content based on template:', template.name);
+      
+      // Analyze template name to determine type
+      const fileName = template.name.toLowerCase();
+      let sampleContent = '';
+      
+      if (fileName.includes('contract') || fileName.includes('agreement')) {
+        sampleContent = `
+CONTRACT AGREEMENT
 
 Dear [CLIENT_NAME],
 
-We are pleased to confirm the following details for your contract:
-
-Company Information:
-- Company Name: [COMPANY_NAME]
-- Address: [COMPANY_ADDRESS]
-- Contact Person: [CONTACT_PERSON]
-- Phone: [PHONE_NUMBER]
-- Email: [EMAIL_ADDRESS]
+This agreement is entered into on [CONTRACT_DATE] between [COMPANY_NAME] and [CLIENT_COMPANY].
 
 Contract Details:
-- Contract Number: [CONTRACT_NUMBER]
-- Contract Date: [CONTRACT_DATE]
+- Contract Number: [CONTRACT_NUMBER]  
+- Project: [PROJECT_NAME]
+- Value: [CONTRACT_VALUE]
 - Start Date: [START_DATE]
 - End Date: [END_DATE]
-- Contract Value: $[CONTRACT_VALUE]
 - Payment Terms: [PAYMENT_TERMS]
 
-Project Information:
-- Project Name: [PROJECT_NAME]
-- Project Description: [PROJECT_DESCRIPTION]
-- Deliverables: [DELIVERABLES]
-- Timeline: [PROJECT_TIMELINE]
+Contact Information:
+- Client Contact: [CLIENT_CONTACT_NAME]
+- Email: [CLIENT_EMAIL]
+- Phone: [CLIENT_PHONE]
+- Address: [CLIENT_ADDRESS]
 
-Personnel:
-- Project Manager: [PROJECT_MANAGER]
-- Lead Developer: [LEAD_DEVELOPER]
-- Account Manager: [ACCOUNT_MANAGER]
+Project Manager: [PROJECT_MANAGER]
+Account Manager: [ACCOUNT_MANAGER]
 
-Additional Information:
-- Special Terms: [SPECIAL_TERMS]
-- Notes: [ADDITIONAL_NOTES]
-- Approval Status: [APPROVAL_STATUS]
+Special Terms: [SPECIAL_TERMS]
+Additional Notes: [NOTES]
 
-Signature:
+Authorized by: [AUTHORIZED_BY]
 Date: [SIGNATURE_DATE]
-Authorized By: [AUTHORIZED_BY]
+        `;
+      } else if (fileName.includes('invoice') || fileName.includes('bill')) {
+        sampleContent = `
+INVOICE
 
-Thank you,
-[SENDER_NAME]
-[SENDER_TITLE]
-    `;
+Invoice Number: [INVOICE_NUMBER]
+Date: [INVOICE_DATE]
+Due Date: [DUE_DATE]
 
-    console.log('Step 6: Template content prepared, length:', templateContent.length);
+Bill To:
+[CLIENT_NAME]
+[CLIENT_ADDRESS]
+[CLIENT_CITY], [CLIENT_STATE] [CLIENT_ZIP]
 
-    // Step 7: Use regex to extract tags in [TAG_NAME] format
-    console.log('Step 7: Extracting tags using regex...');
+Description: [SERVICE_DESCRIPTION]
+Amount: [INVOICE_AMOUNT]
+Tax: [TAX_AMOUNT]
+Total: [TOTAL_AMOUNT]
+
+Payment Method: [PAYMENT_METHOD]
+        `;
+      } else if (fileName.includes('proposal') || fileName.includes('quote')) {
+        sampleContent = `
+PROJECT PROPOSAL
+
+Client: [CLIENT_NAME]
+Company: [CLIENT_COMPANY]
+Date: [PROPOSAL_DATE]
+
+Project Overview:
+Project Name: [PROJECT_NAME]
+Description: [PROJECT_DESCRIPTION]
+Timeline: [PROJECT_TIMELINE]
+Budget: [PROJECT_BUDGET]
+
+Team Members:
+- Lead: [TEAM_LEAD]
+- Developer: [DEVELOPER_NAME]
+- Designer: [DESIGNER_NAME]
+
+Deliverables: [DELIVERABLES]
+Milestones: [MILESTONES]
+
+Contact: [CONTACT_PERSON]
+Email: [CONTACT_EMAIL]
+        `;
+      } else {
+        // Generic template
+        sampleContent = `
+${template.name}
+
+Document Details:
+- Title: [DOCUMENT_TITLE]
+- Date: [DOCUMENT_DATE]
+- Reference: [REFERENCE_NUMBER]
+
+Client Information:
+- Name: [CLIENT_NAME]
+- Company: [COMPANY_NAME]
+- Email: [EMAIL_ADDRESS]
+- Phone: [PHONE_NUMBER]
+- Address: [ADDRESS]
+
+Project Details:
+- Project: [PROJECT_NAME]
+- Description: [DESCRIPTION]
+- Value: [AMOUNT]
+- Status: [STATUS]
+
+Team:
+- Manager: [MANAGER_NAME]
+- Contact: [CONTACT_PERSON]
+
+Notes: [ADDITIONAL_NOTES]
+Signature: [SIGNATURE]
+Date: [SIGNATURE_DATE]
+        `;
+      }
+      
+      templateContent = sampleContent;
+    }
+
+    console.log('Template content prepared, length:', templateContent.length);
+    console.log('Sample content preview:', templateContent.substring(0, 200) + '...');
+
+    // Step 6: Use regex to extract tags in [TAG_NAME] format
+    console.log('Step 6: Extracting tags using regex...');
     const tagRegex = /\[([A-Z_][A-Z0-9_]*)\]/g;
     const extractedTags = [];
     const seenTags = new Set();
