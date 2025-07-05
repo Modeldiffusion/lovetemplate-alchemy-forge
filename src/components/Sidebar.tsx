@@ -55,6 +55,7 @@ const menuItems: MenuItem[] = [
     children: [
       { id: "upload", label: "Upload Templates", icon: Upload, path: "/upload" },
       { id: "extraction", label: "Extract Tags", icon: Target, path: "/extraction" },
+      { id: "tag-library", label: "Tag Library", icon: Database, path: "/tag-library" },
       { id: "library", label: "Template Library", icon: Archive, path: "/library" },
       { id: "versions", label: "Version Control", icon: GitBranch, path: "/versions" },
     ]
@@ -74,7 +75,6 @@ const menuItems: MenuItem[] = [
     label: "Tag Management",
     icon: Tags,
     children: [
-      { id: "tag-library", label: "Tag Library", icon: Database, path: "/tags" },
       { id: "tag-mapping", label: "Tag Mapping", icon: ArrowLeftRight, path: "/tag-mapping" },
       { id: "tag-analytics", label: "Tag Analytics", icon: TrendingUp, path: "/tag-analytics" },
     ]

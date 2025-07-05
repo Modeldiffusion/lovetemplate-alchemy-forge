@@ -13,6 +13,7 @@ import { DocumentComparison } from "@/components/DocumentComparison";
 import { ReviewWorkflow } from "@/components/ReviewWorkflow";
 import { TemplateExtractionGrid } from "@/components/TemplateExtractionGrid";
 import { TemplateExtractionForm } from "@/components/TemplateExtractionForm";
+import { TagLibrary } from "@/components/TagLibrary";
 
 const Index = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -40,6 +41,8 @@ const Index = () => {
       case '/extraction':
         console.log('Rendering TemplateExtractionGrid'); // Debug logging
         return <TemplateExtractionGrid />;
+      case '/tag-library':
+        return <TagLibrary />;
       case '/library':
         return <TemplateUpload />; // Reuse for now
       case '/versions':
