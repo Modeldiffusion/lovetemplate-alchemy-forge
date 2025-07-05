@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { Sidebar } from "@/components/Sidebar";
 import { DashboardHome } from "@/components/DashboardHome";
 import { TemplateUpload } from "@/components/TemplateUpload";
@@ -13,6 +14,7 @@ import { ReviewWorkflow } from "@/components/ReviewWorkflow";
 const Index = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
+  const { user, signOut } = useAuth();
 
   const renderContent = () => {
     switch (location.pathname) {
@@ -90,8 +92,19 @@ const Index = () => {
                 <p className="text-sm text-muted-foreground">AI-powered document transformation platform</p>
               </div>
               <div className="flex items-center space-x-3">
+                <span className="text-sm text-muted-foreground">
+                  {user?.email}
+                </span>
+                <button
+                  onClick={signOut}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Sign Out
+                </button>
                 <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center">
-                  <span className="text-primary-foreground text-sm font-medium">U</span>
+                  <span className="text-primary-foreground text-sm font-medium">
+                    {user?.email?.charAt(0).toUpperCase()}
+                  </span>
                 </div>
               </div>
             </div>
