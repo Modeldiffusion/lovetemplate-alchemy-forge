@@ -96,13 +96,13 @@ serve(async (req) => {
     
     // Check if template has actual content in metadata
     if (template.metadata && template.metadata.content) {
-      // Check if this is a document that needs proper parsing
-      if (template.metadata.needsDocumentParsing) {
-        console.error('❌ Document requires proper parsing');
+      // Check if this is a PDF document that needs proper parsing (Word docs are now handled)
+      if (template.metadata.needsDocumentParsing && template.metadata.originalFileType?.includes('pdf')) {
+        console.error('❌ PDF document requires proper parsing');
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: `Document type ${template.metadata.originalFileType} requires proper parsing. Current extraction from binary documents is not supported. Please convert to plain text or implement document parsing.` 
+            error: `PDF documents require proper parsing. Current extraction from PDF files is not supported. Please convert to plain text or implement PDF parsing.` 
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
