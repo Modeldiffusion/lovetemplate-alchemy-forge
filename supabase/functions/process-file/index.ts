@@ -56,28 +56,53 @@ serve(async (req) => {
           // Look for readable text patterns in the decoded content
           let extractedTextContent = '';
           
-          // Try to find text content between XML tags
-          const textMatches = decodedContent.match(/>([^<]+)</g);
-          if (textMatches) {
-            extractedTextContent = textMatches
-              .map(match => match.replace(/^>|<$/g, '').trim())
-              .filter(text => text.length > 2 && /[a-zA-Z]/.test(text))
-              .join(' ');
+          // Try to find text content between angle brackets, but handle Unicode safely
+          try {
+            // Use a more robust approach to find text content
+            const textRegex = />([^<]{3,})</g;
+            let match;
+            const foundTexts = [];
+            
+            while ((match = textRegex.exec(decodedContent)) !== null && foundTexts.length < 1000) {
+              const text = match[1].trim();
+              // Filter out non-meaningful content
+              if (text.length > 2 && 
+                  /[a-zA-Z]/.test(text) && 
+                  !text.match(/^[0-9\s\.\-_=]+$/) &&
+                  !text.includes('<?xml') &&
+                  !text.includes('xmlns')) {
+                foundTexts.push(text);
+              }
+            }
+            
+            extractedTextContent = foundTexts.join(' ').substring(0, 5000); // Limit length
+          } catch (regexError) {
+            console.log('Regex extraction failed, trying simpler approach');
+            // Fallback: look for common text patterns without regex
+            const lines = decodedContent.split('\n');
+            const textLines = lines.filter(line => {
+              const clean = line.trim();
+              return clean.length > 3 && 
+                     /[a-zA-Z]/.test(clean) && 
+                     !clean.includes('<') && 
+                     !clean.includes('xml');
+            });
+            extractedTextContent = textLines.slice(0, 50).join(' ');
           }
           
-          // If no meaningful text found, fall back to informative message
+          // If no meaningful text found, provide helpful message
           if (extractedTextContent.length < 10) {
-            extractedTextContent = `[Word Document: ${fileType}] - Binary content detected. Please convert to plain text for better extraction.`;
+            extractedTextContent = `[Word Document: ${fileType}] - Complex document structure detected. For better tag extraction, please convert to plain text format.`;
           } else {
             console.log(`Successfully extracted ${extractedTextContent.length} characters from Word document`);
           }
           
-          contentToStore = extractedTextContent; // Store extracted text instead of base64
+          contentToStore = extractedTextContent;
           extractedText = extractedTextContent;
         } catch (docxError) {
           console.error('Error extracting from Word document:', docxError);
-          contentToStore = fileContent;
-          extractedText = `[Word Document: ${fileType}] - Text extraction failed. Please convert to plain text format.`;
+          contentToStore = `[Word Document: ${fileType}] - Text extraction failed due to complex formatting. Please convert to plain text format.`;
+          extractedText = contentToStore;
         }
       } else if (fileType === 'application/pdf') {
         // For PDF documents, store base64 for now
