@@ -28,7 +28,7 @@ import {
   Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTagMappings } from "@/hooks/useTagMappings";
+import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useToast } from "@/hooks/use-toast";
 
@@ -79,26 +79,30 @@ export const TagMappingInterface = () => {
   const [selectedMappings, setSelectedMappings] = useState<string[]>([]);
   const [isTestingLogic, setIsTestingLogic] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [showExtractionDialog, setShowExtractionDialog] = useState(false);
+  const [selectedTemplateForExtraction, setSelectedTemplateForExtraction] = useState<string>("");
   
   const { templates } = useTemplates();
   const { 
-    mappings, 
     extractedTags, 
     internalTags, 
+    tagMappings,
     loading, 
     error,
-    createMapping,
-    updateMapping,
-    bulkMapTags
-  } = useTagMappings(selectedTemplate === "all" ? undefined : selectedTemplate);
+    extractTags,
+    createTagMapping,
+    updateTagMapping,
+    refetch
+  } = useExtractedTags(selectedTemplate === "all" ? undefined : selectedTemplate);
   const { toast } = useToast();
 
-  // Transform API data to match component interface
+  // Transform data to match component interface
   const sourceTags: SourceTag[] = extractedTags.map(tag => ({
     id: tag.id,
     name: tag.text,
     templateName: tag.template?.name || "Unknown Template",
-    templateId: tag.templateId,
+    templateId: tag.template_id,
     position: tag.position,
     context: tag.context || "",
     confidence: tag.confidence,
@@ -112,7 +116,7 @@ export const TagMappingInterface = () => {
     
     let statusMatch = true;
     if (statusFilter !== "all") {
-      const mapping = mappings.find(m => m.extractedTagId === tag.id);
+      const mapping = tagMappings.find(m => m.extracted_tag_id === tag.id);
       const currentStatus = mapping?.status.toLowerCase() || "unmapped";
       statusMatch = currentStatus === statusFilter;
     }
@@ -121,7 +125,7 @@ export const TagMappingInterface = () => {
   });
 
   const getMappingForTag = (tagId: string) => {
-    return mappings.find(m => m.extractedTagId === tagId);
+    return tagMappings.find(m => m.extracted_tag_id === tagId);
   };
 
   const getInternalTag = (id: string) => {
@@ -149,15 +153,15 @@ export const TagMappingInterface = () => {
 
   const handleMappingUpdate = async (sourceTagId: string, updates: any) => {
     try {
-      const existing = mappings.find(m => m.extractedTagId === sourceTagId);
+      const existing = tagMappings.find(m => m.extracted_tag_id === sourceTagId);
       
       if (existing) {
-        await updateMapping(existing.id, updates);
+        await updateTagMapping(existing.id, updates);
       } else {
-        await createMapping({
-          extractedTagId: sourceTagId,
-          internalTagId: updates.internalTagId,
-          mappingLogic: updates.mappingLogic,
+        await createTagMapping({
+          extracted_tag_id: sourceTagId,
+          internal_tag_id: updates.internal_tag_id,
+          mapping_logic: updates.mapping_logic,
           confidence: updates.confidence || 50
         });
       }
@@ -175,34 +179,41 @@ export const TagMappingInterface = () => {
     }
   };
 
-  const handleBulkMap = async () => {
-    setIsValidating(true);
+  const handleExtractTags = async (templateId: string) => {
+    setIsExtracting(true);
     try {
-      await bulkMapTags(selectedMappings);
-      setSelectedMappings([]);
+      await extractTags(templateId);
+      setShowExtractionDialog(false);
       toast({
-        title: "Bulk mapping completed",
-        description: `Successfully mapped ${selectedMappings.length} tags using AI`
+        title: "Tags extracted successfully",
+        description: "AI has extracted tags from the template"
       });
     } catch (error) {
       toast({
-        title: "Bulk mapping failed",
-        description: "Could not complete AI-powered bulk mapping",
+        title: "Extraction failed",
+        description: "Could not extract tags from template",
         variant: "destructive"
       });
     } finally {
-      setIsValidating(false);
+      setIsExtracting(false);
     }
+  };
+
+  const handleBulkMap = async () => {
+    // For now, just show a message - bulk mapping would need additional implementation
+    toast({
+      title: "Feature coming soon",
+      description: "Bulk AI mapping will be available in the next update"
+    });
   };
 
   const validateMappings = async () => {
     setIsTestingLogic(true);
     setTimeout(() => {
-      mappings.forEach(mapping => {
-        if (mapping.status === 'MAPPED' || mapping.status === 'LOGIC') {
-          handleMappingUpdate(mapping.extractedTagId, {
-            status: 'VALIDATED',
-            validationResult: '✓ Validation passed',
+      tagMappings.forEach(mapping => {
+        if (mapping.status === 'mapped' || mapping.status === 'logic') {
+          handleMappingUpdate(mapping.extracted_tag_id, {
+            status: 'validated',
             confidence: Math.min(mapping.confidence + 5, 100)
           });
         }
@@ -215,8 +226,8 @@ export const TagMappingInterface = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-foreground">Tag Mapping Interface</h2>
-          <p className="text-muted-foreground">Map template tags to internal fields with custom logic support</p>
+          <h2 className="text-3xl font-bold text-foreground">Tag Extraction & Mapping</h2>
+          <p className="text-muted-foreground">Extract tags from templates and map them to internal fields</p>
         </div>
         <div className="flex space-x-2">
           <Button variant="outline" onClick={validateMappings} disabled={isTestingLogic}>
@@ -229,6 +240,90 @@ export const TagMappingInterface = () => {
           </Button>
         </div>
       </div>
+
+      {/* Templates Section */}
+      <Card className="bg-gradient-card shadow-custom-md">
+        <CardHeader>
+          <CardTitle>Templates for Tag Extraction</CardTitle>
+          <CardDescription>Select a template to extract tags using AI</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {templates.map((template) => (
+              <Card key={template.id} className="bg-card/50 hover:bg-card/80 transition-colors">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <FileText className="w-5 h-5 text-primary" />
+                      <div>
+                        <h4 className="font-medium">{template.name}</h4>
+                        <p className="text-xs text-muted-foreground">
+                          {extractedTags.filter(tag => tag.template_id === template.id).length} tags extracted
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedTemplateForExtraction(template.id);
+                        setShowExtractionDialog(true);
+                      }}
+                    >
+                      <Wand2 className="w-4 h-4 mr-1" />
+                      Extract
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tag Extraction Dialog */}
+      <Dialog open={showExtractionDialog} onOpenChange={setShowExtractionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Extract Tags from Template</DialogTitle>
+            <DialogDescription>
+              Use AI to automatically extract tags and placeholders from the selected template.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm">
+              <p className="mb-2">This will:</p>
+              <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                <li>Analyze the template content using AI</li>
+                <li>Extract all placeholders and variable fields</li>
+                <li>Add extracted tags to your tag library</li>
+                <li>Enable mapping to internal tag fields</li>
+              </ul>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button variant="outline" onClick={() => setShowExtractionDialog(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => handleExtractTags(selectedTemplateForExtraction)}
+                disabled={isExtracting}
+              >
+                {isExtracting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Extracting...
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="w-4 h-4 mr-2" />
+                    Extract Tags
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Template Selection and Filters */}
       <Card className="bg-gradient-card shadow-custom-md">
@@ -308,8 +403,8 @@ export const TagMappingInterface = () => {
               <CardTitle>Tag Mappings</CardTitle>
               <CardDescription>
                 {filteredSourceTags.length} tags • 
-                {mappings.filter(m => m.status === 'MAPPED' || m.status === 'VALIDATED').length} mapped • 
-                {mappings.filter(m => m.status === 'UNMAPPED').length} unmapped
+                {tagMappings.filter(m => m.status === 'mapped' || m.status === 'validated').length} mapped • 
+                {tagMappings.filter(m => m.status === 'unmapped').length} unmapped
               </CardDescription>
             </div>
             <div className="flex items-center space-x-2">
@@ -350,7 +445,6 @@ export const TagMappingInterface = () => {
             {/* Table Rows */}
             {filteredSourceTags.map((sourceTag) => {
               const mapping = getMappingForTag(sourceTag.id);
-              const internalTag = mapping?.internalTagId ? getInternalTag(mapping.internalTagId) : null;
               const status = mapping?.status.toLowerCase() || 'unmapped';
 
               return (
@@ -387,12 +481,10 @@ export const TagMappingInterface = () => {
                   {/* Internal Mapping */}
                   <div className="col-span-3">
                     <Select 
-                      value={mapping?.internalTagId || ""} 
+                      value={mapping?.internal_tag_id || ""} 
                       onValueChange={(value) => handleMappingUpdate(sourceTag.id, { 
-                        internalTagId: value, 
-                        status: 'mapped',
-                        lastModified: 'Just now',
-                        modifiedBy: 'Current User'
+                        internal_tag_id: value, 
+                        status: 'mapped'
                       })}
                     >
                       <SelectTrigger className="h-8">
@@ -409,8 +501,10 @@ export const TagMappingInterface = () => {
                         ))}
                       </SelectContent>
                     </Select>
-                    {internalTag && (
-                      <p className="text-xs text-muted-foreground mt-1">{internalTag.description}</p>
+                    {mapping?.internal_tag_id && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {internalTags.find(t => t.id === mapping.internal_tag_id)?.description}
+                      </p>
                     )}
                   </div>
 
@@ -418,18 +512,13 @@ export const TagMappingInterface = () => {
                   <div className="col-span-3">
                     <Textarea
                       placeholder="Custom mapping logic (JS)..."
-                      value={mapping?.mappingLogic || ""}
+                      value={mapping?.mapping_logic || ""}
                       onChange={(e) => handleMappingUpdate(sourceTag.id, { 
-                        mappingLogic: e.target.value,
-                        status: e.target.value ? 'logic' : (mapping?.internalTagId ? 'mapped' : 'unmapped'),
-                        lastModified: 'Just now',
-                        modifiedBy: 'Current User'
+                        mapping_logic: e.target.value,
+                        status: e.target.value ? 'logic' : (mapping?.internal_tag_id ? 'mapped' : 'unmapped')
                       })}
                       className="h-8 text-xs font-mono resize-none"
                     />
-                    {mapping?.validationResult && (
-                      <p className="text-xs text-success mt-1">{mapping.validationResult}</p>
-                    )}
                   </div>
 
                   {/* Status */}
@@ -474,7 +563,7 @@ export const TagMappingInterface = () => {
             <div className="flex items-center space-x-2">
               <CheckCircle2 className="w-5 h-5 text-success" />
               <div>
-                <div className="text-2xl font-bold">{mappings.filter(m => m.status === 'validated').length}</div>
+                <div className="text-2xl font-bold">{tagMappings.filter(m => m.status === 'validated').length}</div>
                 <p className="text-xs text-muted-foreground">Validated</p>
               </div>
             </div>
@@ -486,7 +575,7 @@ export const TagMappingInterface = () => {
             <div className="flex items-center space-x-2">
               <ArrowRight className="w-5 h-5 text-primary" />
               <div>
-                <div className="text-2xl font-bold">{mappings.filter(m => m.status === 'mapped').length}</div>
+                <div className="text-2xl font-bold">{tagMappings.filter(m => m.status === 'mapped').length}</div>
                 <p className="text-xs text-muted-foreground">Direct Mapped</p>
               </div>
             </div>
@@ -498,7 +587,7 @@ export const TagMappingInterface = () => {
             <div className="flex items-center space-x-2">
               <Code className="w-5 h-5 text-accent" />
               <div>
-                <div className="text-2xl font-bold">{mappings.filter(m => m.status === 'logic').length}</div>
+                <div className="text-2xl font-bold">{tagMappings.filter(m => m.status === 'logic').length}</div>
                 <p className="text-xs text-muted-foreground">Custom Logic</p>
               </div>
             </div>
@@ -510,7 +599,7 @@ export const TagMappingInterface = () => {
             <div className="flex items-center space-x-2">
               <Clock className="w-5 h-5 text-warning" />
               <div>
-                <div className="text-2xl font-bold">{sourceTags.length - mappings.length}</div>
+                <div className="text-2xl font-bold">{sourceTags.length - tagMappings.length}</div>
                 <p className="text-xs text-muted-foreground">Unmapped</p>
               </div>
             </div>

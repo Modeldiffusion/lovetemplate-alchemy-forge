@@ -9,6 +9,95 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      extracted_tags: {
+        Row: {
+          confidence: number
+          context: string | null
+          extracted_at: string
+          extracted_by: string | null
+          id: string
+          pattern: string | null
+          position: number
+          template_id: string
+          text: string
+          updated_at: string
+        }
+        Insert: {
+          confidence?: number
+          context?: string | null
+          extracted_at?: string
+          extracted_by?: string | null
+          id?: string
+          pattern?: string | null
+          position?: number
+          template_id: string
+          text: string
+          updated_at?: string
+        }
+        Update: {
+          confidence?: number
+          context?: string | null
+          extracted_at?: string
+          extracted_by?: string | null
+          id?: string
+          pattern?: string | null
+          position?: number
+          template_id?: string
+          text?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extracted_tags_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internal_tags: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          data_type: string
+          default_value: string | null
+          description: string | null
+          id: string
+          is_required: boolean
+          name: string
+          updated_at: string
+          validation: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          data_type?: string
+          default_value?: string | null
+          description?: string | null
+          id?: string
+          is_required?: boolean
+          name: string
+          updated_at?: string
+          validation?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          data_type?: string
+          default_value?: string | null
+          description?: string | null
+          id?: string
+          is_required?: boolean
+          name?: string
+          updated_at?: string
+          validation?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -38,6 +127,57 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      tag_mappings: {
+        Row: {
+          confidence: number
+          created_at: string
+          created_by: string | null
+          extracted_tag_id: string
+          id: string
+          internal_tag_id: string | null
+          mapping_logic: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          created_by?: string | null
+          extracted_tag_id: string
+          id?: string
+          internal_tag_id?: string | null
+          mapping_logic?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          created_by?: string | null
+          extracted_tag_id?: string
+          id?: string
+          internal_tag_id?: string | null
+          mapping_logic?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tag_mappings_extracted_tag_id_fkey"
+            columns: ["extracted_tag_id"]
+            isOneToOne: false
+            referencedRelation: "extracted_tags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tag_mappings_internal_tag_id_fkey"
+            columns: ["internal_tag_id"]
+            isOneToOne: false
+            referencedRelation: "internal_tags"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       templates: {
         Row: {
