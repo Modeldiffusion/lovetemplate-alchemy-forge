@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 interface SourceTag {
   id: string;
@@ -95,7 +96,6 @@ export const TagMappingInterface = () => {
     updateTagMapping,
     refetch
   } = useExtractedTags(selectedTemplate === "all" ? undefined : selectedTemplate);
-  const { toast } = useToast();
 
   // Transform data to match component interface
   const sourceTags: SourceTag[] = extractedTags.map(tag => ({
@@ -166,16 +166,9 @@ export const TagMappingInterface = () => {
         });
       }
       
-      toast({
-        title: "Mapping updated",
-        description: "Tag mapping has been saved successfully"
-      });
+      toast.success("Tag mapping has been saved successfully");
     } catch (error) {
-      toast({
-        title: "Update failed",
-        description: "Could not update tag mapping",
-        variant: "destructive"
-      });
+      toast.error("Could not update tag mapping");
     }
   };
 
@@ -184,16 +177,9 @@ export const TagMappingInterface = () => {
     try {
       await extractTags(templateId);
       setShowExtractionDialog(false);
-      toast({
-        title: "Tags extracted successfully",
-        description: "AI has extracted tags from the template"
-      });
+      toast.success("AI has extracted tags from the template");
     } catch (error) {
-      toast({
-        title: "Extraction failed",
-        description: "Could not extract tags from template",
-        variant: "destructive"
-      });
+      toast.error("Could not extract tags from template");
     } finally {
       setIsExtracting(false);
     }
@@ -201,10 +187,7 @@ export const TagMappingInterface = () => {
 
   const handleBulkMap = async () => {
     // For now, just show a message - bulk mapping would need additional implementation
-    toast({
-      title: "Feature coming soon",
-      description: "Bulk AI mapping will be available in the next update"
-    });
+    toast.info("Bulk AI mapping will be available in the next update");
   };
 
   const validateMappings = async () => {

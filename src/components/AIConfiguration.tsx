@@ -12,8 +12,25 @@ import { Slider } from "@/components/ui/slider";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Settings, Zap, Brain, Key, TestTube, BarChart3, CheckCircle2, AlertCircle, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { aiApi, LLMProvider as APILLMProvider } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
+
+// Mock LLM Provider interface for demo purposes
+interface LLMProvider {
+  id: string;
+  name: string;
+  provider: string;
+  model: string;
+  isActive: boolean;
+  maxTokens: number;
+  temperature: number;
+  systemPrompt: string;
+  rateLimitRPM: number;
+  healthStatus: string;
+  totalRequests: number;
+  averageLatency?: number;
+  lastUsedAt?: string;
+}
 
 interface TestResult {
   id: string;
@@ -28,29 +45,48 @@ interface TestResult {
 }
 
 export const AIConfiguration = () => {
-  const [providers, setProviders] = useState<APILLMProvider[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
+  const [providers, setProviders] = useState<LLMProvider[]>([
+    {
+      id: "1",
+      name: "OpenAI GPT-4",
+      provider: "OpenAI",
+      model: "gpt-4",
+      isActive: true,
+      maxTokens: 4000,
+      temperature: 0.7,
+      systemPrompt: "You are a helpful assistant for extracting tags from document templates. Extract all placeholder fields, variables, and fillable areas.",
+      rateLimitRPM: 60,
+      healthStatus: "healthy",
+      totalRequests: 1250,
+      averageLatency: 850,
+      lastUsedAt: "2024-01-15T10:30:00Z"
+    },
+    {
+      id: "2", 
+      name: "Claude 3 Haiku",
+      provider: "Anthropic",
+      model: "claude-3-haiku",
+      isActive: false,
+      maxTokens: 3000,
+      temperature: 0.5,
+      systemPrompt: "Extract and identify template placeholders with high accuracy. Focus on variable fields and fillable content.",
+      rateLimitRPM: 40,
+      healthStatus: "healthy",
+      totalRequests: 340,
+      averageLatency: 1200,
+      lastUsedAt: "2024-01-10T14:20:00Z"
+    }
+  ]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchProviders();
   }, []);
 
+  // Mock functions that work locally without API calls
   const fetchProviders = async () => {
-    try {
-      const response = await aiApi.getProviders();
-      if (response.success && response.data) {
-        setProviders(response.data);
-      }
-    } catch (error) {
-      toast({
-        title: "Failed to load providers",
-        description: "Could not fetch AI providers from server",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+    // Providers are already set in useState above - no API call needed
+    setLoading(false);
   };
 
   const [testResults, setTestResults] = useState<TestResult[]>([
@@ -67,7 +103,7 @@ export const AIConfiguration = () => {
     }
   ]);
 
-  const [selectedProvider, setSelectedProvider] = useState<APILLMProvider | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<LLMProvider | null>(null);
   const [isAddingProvider, setIsAddingProvider] = useState(false);
   const [newProvider, setNewProvider] = useState<{
     name?: string;
@@ -102,92 +138,78 @@ export const AIConfiguration = () => {
     }
   };
 
-  const handleProviderUpdate = async (providerId: string, updates: Partial<APILLMProvider>) => {
+  const handleProviderUpdate = async (providerId: string, updates: Partial<LLMProvider>) => {
     try {
-      const response = await aiApi.updateProvider(providerId, updates);
-      if (response.success && response.data) {
-        setProviders(prev => prev.map(provider => 
-          provider.id === providerId ? response.data! : provider
-        ));
-        toast({
-          title: "Provider updated",
-          description: "AI provider configuration has been saved"
-        });
-      }
+      // Mock update - just update local state
+      setProviders(prev => prev.map(provider => 
+        provider.id === providerId ? { ...provider, ...updates } : provider
+      ));
+      toast.success("AI provider configuration has been saved");
     } catch (error) {
-      toast({
-        title: "Update failed",
-        description: "Could not update provider configuration",
-        variant: "destructive"
-      });
+      toast.error("Could not update provider configuration");
     }
   };
 
   const handleTestProvider = async (providerId: string) => {
     try {
-      const response = await aiApi.testProvider(providerId, "Test document for AI processing");
+      // Mock test - simulate API response
+      const provider = providers.find(p => p.id === providerId);
+      const mockResponseTime = Math.random() * 2 + 0.5; // 0.5-2.5s
+      const mockSuccess = Math.random() > 0.1; // 90% success rate
       
       const newTest: TestResult = {
         id: Date.now().toString(),
-        provider: providers.find(p => p.id === providerId)?.name || "Unknown",
+        provider: provider?.name || "Unknown",
         testCase: "API Connection Test",
         input: "Test document for AI processing",
         expectedOutput: "document, test, processing",
-        actualOutput: response.data?.output || "Error",
-        success: response.success,
-        responseTime: response.data?.responseTime || 0,
+        actualOutput: mockSuccess ? "document, test, processing, analysis" : "Connection timeout",
+        success: mockSuccess,
+        responseTime: mockResponseTime,
         timestamp: "Just now"
       };
       
       setTestResults(prev => [newTest, ...prev]);
       
-      toast({
-        title: response.success ? "Test successful" : "Test failed",
-        description: response.success 
-          ? `Provider responded in ${response.data?.responseTime.toFixed(2)}s`
-          : response.error || "Connection test failed",
-        variant: response.success ? "default" : "destructive"
-      });
+      if (mockSuccess) {
+        toast.success(`Provider responded in ${mockResponseTime.toFixed(2)}s`);
+      } else {
+        toast.error("Connection test failed");
+      }
       
     } catch (error) {
-      toast({
-        title: "Test failed",
-        description: "Could not test provider connection",
-        variant: "destructive"
-      });
+      toast.error("Could not test provider connection");
     }
   };
 
   const addProvider = async () => {
     if (newProvider.name && newProvider.model && newProvider.apiKey) {
       try {
-        const response = await aiApi.createProvider({
+        // Mock provider creation
+        const mockProvider: LLMProvider = {
+          id: Date.now().toString(),
           name: newProvider.name,
-          provider: newProvider.model.includes('gpt') ? 'openai' : 
-                   newProvider.model.includes('claude') ? 'anthropic' : 'google',
+          provider: newProvider.model.includes('gpt') ? 'OpenAI' : 
+                   newProvider.model.includes('claude') ? 'Anthropic' : 'Google',
           model: newProvider.model,
-          apiKey: newProvider.apiKey,
+          isActive: true,
+          maxTokens: newProvider.maxTokens || 4096,
+          temperature: newProvider.temperature || 0.7,
           systemPrompt: newProvider.systemPrompt || "You are an expert document analyzer.",
-          maxTokens: newProvider.maxTokens,
-          temperature: newProvider.temperature
-        });
+          rateLimitRPM: 60,
+          healthStatus: "healthy",
+          totalRequests: 0,
+          averageLatency: 1000,
+          lastUsedAt: new Date().toISOString()
+        };
         
-        if (response.success && response.data) {
-          setProviders(prev => [...prev, response.data!]);
-          setNewProvider({});
-          setIsAddingProvider(false);
-          
-          toast({
-            title: "Provider added",
-            description: "New AI provider has been configured successfully"
-          });
-        }
+        setProviders(prev => [...prev, mockProvider]);
+        setNewProvider({});
+        setIsAddingProvider(false);
+        
+        toast.success("New AI provider has been configured successfully");
       } catch (error) {
-        toast({
-          title: "Failed to add provider",
-          description: "Could not create new AI provider",
-          variant: "destructive"
-        });
+        toast.error("Could not create new AI provider");
       }
     }
   };
