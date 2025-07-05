@@ -89,146 +89,47 @@ serve(async (req) => {
 
     console.log('✅ Template found:', template.name);
 
-    // Step 5: Try to get actual file content, fallback to user-provided content
+    // Step 5: Get actual template content from metadata or file
     console.log('Step 5: Attempting to get template content...');
     
     let templateContent = '';
     
-    // Check if file_path exists and try to read from storage
-    if (template.file_path) {
-      console.log('File path exists:', template.file_path);
-      // TODO: In a full implementation, read from Supabase Storage
-      // const { data: fileData } = await supabaseClient.storage.from('templates').download(template.file_path);
-      console.log('Note: File reading from storage not implemented yet');
-    }
-    
-    // For now, since file_path is null, we'll use template metadata if available
-    // or generate a realistic sample based on the template name
+    // Check if template has actual content in metadata
     if (template.metadata && template.metadata.content) {
       templateContent = template.metadata.content;
-      console.log('Using content from metadata');
-    } else {
-      // Generate more realistic sample content based on the file name and type
-      console.log('Generating sample content based on template:', template.name);
-      
-      // Analyze template name to determine type
-      const fileName = template.name.toLowerCase();
-      let sampleContent = '';
-      
-      if (fileName.includes('contract') || fileName.includes('agreement')) {
-        sampleContent = `
-CONTRACT AGREEMENT
-
-Dear [CLIENT_NAME],
-
-This agreement is entered into on [CONTRACT_DATE] between [COMPANY_NAME] and [CLIENT_COMPANY].
-
-Contract Details:
-- Contract Number: [CONTRACT_NUMBER]  
-- Project: [PROJECT_NAME]
-- Value: [CONTRACT_VALUE]
-- Start Date: [START_DATE]
-- End Date: [END_DATE]
-- Payment Terms: [PAYMENT_TERMS]
-
-Contact Information:
-- Client Contact: [CLIENT_CONTACT_NAME]
-- Email: [CLIENT_EMAIL]
-- Phone: [CLIENT_PHONE]
-- Address: [CLIENT_ADDRESS]
-
-Project Manager: [PROJECT_MANAGER]
-Account Manager: [ACCOUNT_MANAGER]
-
-Special Terms: [SPECIAL_TERMS]
-Additional Notes: [NOTES]
-
-Authorized by: [AUTHORIZED_BY]
-Date: [SIGNATURE_DATE]
-        `;
-      } else if (fileName.includes('invoice') || fileName.includes('bill')) {
-        sampleContent = `
-INVOICE
-
-Invoice Number: [INVOICE_NUMBER]
-Date: [INVOICE_DATE]
-Due Date: [DUE_DATE]
-
-Bill To:
-[CLIENT_NAME]
-[CLIENT_ADDRESS]
-[CLIENT_CITY], [CLIENT_STATE] [CLIENT_ZIP]
-
-Description: [SERVICE_DESCRIPTION]
-Amount: [INVOICE_AMOUNT]
-Tax: [TAX_AMOUNT]
-Total: [TOTAL_AMOUNT]
-
-Payment Method: [PAYMENT_METHOD]
-        `;
-      } else if (fileName.includes('proposal') || fileName.includes('quote')) {
-        sampleContent = `
-PROJECT PROPOSAL
-
-Client: [CLIENT_NAME]
-Company: [CLIENT_COMPANY]
-Date: [PROPOSAL_DATE]
-
-Project Overview:
-Project Name: [PROJECT_NAME]
-Description: [PROJECT_DESCRIPTION]
-Timeline: [PROJECT_TIMELINE]
-Budget: [PROJECT_BUDGET]
-
-Team Members:
-- Lead: [TEAM_LEAD]
-- Developer: [DEVELOPER_NAME]
-- Designer: [DESIGNER_NAME]
-
-Deliverables: [DELIVERABLES]
-Milestones: [MILESTONES]
-
-Contact: [CONTACT_PERSON]
-Email: [CONTACT_EMAIL]
-        `;
-      } else {
-        // Generic template with mixed delimiters for testing
-        sampleContent = `
-${template.name}
-
-Document Details:
-- Title: [DOCUMENT_TITLE]
-- Date: <<DOCUMENT_DATE>>
-- Reference: {REFERENCE_NUMBER}
-
-Client Information:
-- Name: [CLIENT_NAME]
-- Company: <<COMPANY_NAME>>
-- Email: {EMAIL_ADDRESS}, @client_phone, @client_id
-- Phone: [PHONE_NUMBER]
-- Address: <<ADDRESS>>
-
-Project Details:
-- Project: [PROJECT_NAME]
-- Description: <<DESCRIPTION>>
-- Value: {AMOUNT}
-- Status: [STATUS]
-- Tags: @priority, @department, @category
-
-Team:
-- Manager: <<MANAGER_NAME>>
-- Contact: {CONTACT_PERSON}
-- Assigned to: @team_lead, @developer
-
-Notes: [ADDITIONAL_NOTES]
-Signature: <<SIGNATURE>>
-Date: {SIGNATURE_DATE}
-
-Footer: Contact @support for assistance, reference @ticket_number
-        `;
+      console.log('Using actual content from metadata, length:', templateContent.length);
+    } else if (template.file_path) {
+      console.log('File path exists:', template.file_path);
+      // TODO: Read from Supabase Storage when implemented
+      const { data: fileData, error: storageError } = await supabaseClient.storage
+        .from('templates')
+        .download(template.file_path);
+        
+      if (storageError) {
+        console.error('Storage read error:', storageError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Cannot read template file: ${storageError.message}` 
+          }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
       
-      templateContent = sampleContent;
+      if (fileData) {
+        templateContent = await fileData.text();
+        console.log('Successfully read file from storage, length:', templateContent.length);
+      }
+    } else {
+      // No content available - return error instead of using fake content
+      console.error('❌ No template content available');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'No template content available. Please re-upload the template with content storage enabled.' 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log('Template content prepared, length:', templateContent.length);
