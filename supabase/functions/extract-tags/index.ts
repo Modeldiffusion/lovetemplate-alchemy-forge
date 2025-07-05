@@ -204,7 +204,7 @@ Document Details:
 Client Information:
 - Name: [CLIENT_NAME]
 - Company: <<COMPANY_NAME>>
-- Email: {EMAIL_ADDRESS}
+- Email: {EMAIL_ADDRESS}, @client_phone, @client_id
 - Phone: [PHONE_NUMBER]
 - Address: <<ADDRESS>>
 
@@ -213,14 +213,18 @@ Project Details:
 - Description: <<DESCRIPTION>>
 - Value: {AMOUNT}
 - Status: [STATUS]
+- Tags: @priority, @department, @category
 
 Team:
 - Manager: <<MANAGER_NAME>>
 - Contact: {CONTACT_PERSON}
+- Assigned to: @team_lead, @developer
 
 Notes: [ADDITIONAL_NOTES]
 Signature: <<SIGNATURE>>
 Date: {SIGNATURE_DATE}
+
+Footer: Contact @support for assistance, reference @ticket_number
         `;
       }
       
@@ -243,31 +247,39 @@ Date: {SIGNATURE_DATE}
     const config = { ...defaultConfig, ...extractionConfig };
     console.log('Using extraction config:', config);
     
-    // Build regex pattern for delimiter pairs
+    // Build regex pattern for delimiter pairs and @ tags
     const buildExtractionRegex = (delimiterPairs, caseSensitive) => {
       // Escape special regex characters properly
       const escapeRegex = (str) => {
         return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       };
       
-      // Create patterns for each delimiter pair
+      const patterns = [];
+      
+      // Create patterns for delimiter pairs
       const pairPatterns = delimiterPairs
         .filter(pair => pair.start && pair.end)
         .map(pair => {
           const startEscaped = escapeRegex(pair.start);
           const endEscaped = pair.end === ' ' ? '\\s+' : escapeRegex(pair.end);
           
-          // Each pair captures: (start_delimiter)(tag_content)(end_delimiter)
-          return `(${startEscaped})([A-Z_][A-Z0-9_]*)(${endEscaped})`;
+          // Support mixed case tags like tag_Name or TAG_NAME
+          return `(${startEscaped})([A-Za-z_][A-Za-z0-9_]*)(${endEscaped})`;
         });
       
-      if (pairPatterns.length === 0) {
-        // Fallback to default if no valid pairs
-        return /(\\[)([A-Z_][A-Z0-9_]*)(\\])/gi;
+      patterns.push(...pairPatterns);
+      
+      // Add @ tag pattern (comma or space terminated, or end of line)
+      // @tagname followed by comma, space, or end of string/line
+      patterns.push('(@)([A-Za-z_][A-Za-z0-9_]*)(?=[ ,\\n\\t\\r]|$)');
+      
+      if (patterns.length === 0) {
+        // Fallback to default if no valid patterns
+        return /(\\[)([A-Za-z_][A-Za-z0-9_]*)(\\])/gi;
       }
       
-      // Combine all pair patterns with OR
-      const combinedPattern = pairPatterns.join('|');
+      // Combine all patterns with OR
+      const combinedPattern = patterns.join('|');
       const flags = caseSensitive ? 'g' : 'gi';
       
       return new RegExp(combinedPattern, flags);
@@ -286,11 +298,32 @@ Date: {SIGNATURE_DATE}
 
     while ((match = tagRegex.exec(templateContent)) !== null) {
       const fullMatch = match[0]; // Full match including delimiters
-      const startDelim = match[1]; // Start delimiter
-      const tagContent = match[2]; // Tag content without delimiters  
-      const endDelim = match[3]; // End delimiter
       
-      const tagText = config.includeDelimiters ? fullMatch : tagContent;
+      // Handle different capture groups based on pattern type
+      let startDelim = '';
+      let tagContent = '';
+      let endDelim = '';
+      
+      // Find which capture groups are populated
+      for (let i = 1; i < match.length; i += 3) {
+        if (match[i] && match[i + 1]) {
+          startDelim = match[i];
+          tagContent = match[i + 1];
+          endDelim = match[i + 2] || '';
+          break;
+        }
+      }
+      
+      // For @ tags, if no explicit end delimiter is captured, use comma or space
+      if (startDelim === '@' && !endDelim) {
+        // Look ahead in the text to find the actual terminator
+        const afterMatch = templateContent.substring(match.index + fullMatch.length, match.index + fullMatch.length + 10);
+        if (afterMatch.match(/^[, \n\t]/)) {
+          endDelim = afterMatch.charAt(0);
+        }
+      }
+      
+      const tagText = config.includeDelimiters ? (startDelim + tagContent + endDelim) : tagContent;
       
       // Skip if we've already seen this tag
       if (seenTags.has(tagText)) {
@@ -304,10 +337,14 @@ Date: {SIGNATURE_DATE}
       const context = templateContent.substring(start, end).trim();
 
       // Determine pattern/category based on tag content
-      let pattern = `${startDelim}...${endDelim} placeholder`;
+      let pattern = `${startDelim}...${endDelim || ''} placeholder`;
       let confidence = 85;
 
-      if (tagContent.includes('DATE')) {
+      // Special handling for @ tags
+      if (startDelim === '@') {
+        pattern = '@tag (comma/space terminated)';
+        confidence = 90;
+      } else if (tagContent.includes('DATE')) {
         pattern = 'Date placeholder';
         confidence = 95;
       } else if (tagContent.includes('NAME')) {

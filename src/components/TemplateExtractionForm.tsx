@@ -21,8 +21,8 @@ export const TemplateExtractionForm = () => {
   const { extractTags, loading } = useExtractedTags();
 
   const [regexPattern, setRegexPattern] = useState("");
-  const [startDelimiters, setStartDelimiters] = useState<string[]>(["["]);
-  const [endDelimiters, setEndDelimiters] = useState<string[]>(["]"]);
+  const [startDelimiters, setStartDelimiters] = useState<string[]>(["[", "<<", "{", "@"]);
+  const [endDelimiters, setEndDelimiters] = useState<string[]>(["]", ">>", "}", ","]);
   const [includeDelimiters, setIncludeDelimiters] = useState(true);
   const [extractionMethod, setExtractionMethod] = useState<"regex" | "delimiters">("delimiters");
 
@@ -61,9 +61,19 @@ export const TemplateExtractionForm = () => {
 
       // Now try the actual extraction
       for (const template of targetTemplates) {
+        // Convert delimiter arrays to delimiter pairs
+        const delimiterPairs = [];
+        
+        // Match start and end delimiters
+        for (let i = 0; i < Math.min(startDelimiters.length, endDelimiters.length); i++) {
+          delimiterPairs.push({
+            start: startDelimiters[i],
+            end: endDelimiters[i]
+          });
+        }
+        
         const extractionConfig = {
-          startDelimiters,
-          endDelimiters,
+          delimiterPairs,
           includeDelimiters,
           caseSensitive: false
         };
@@ -283,16 +293,16 @@ export const TemplateExtractionForm = () => {
                   <Label htmlFor="includeDelimitersForm">Include delimiters in extracted tags</Label>
                 </div>
                 <div className="bg-muted/50 p-3 rounded-lg">
-                  <p className="text-sm font-medium mb-1">Examples:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {startDelimiters.slice(0, 2).map((start, i) => (
-                      endDelimiters.slice(0, 2).map((end, j) => (
-                        <code key={`${i}-${j}`} className="bg-muted px-1 rounded text-xs">
-                          {start === ' ' ? '' : start}TAG_NAME{end === ' ' ? ' ' : end}
-                        </code>
-                      ))
-                    ))}
+                  <p className="text-sm font-medium mb-1">Supported formats:</p>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <code className="bg-muted px-2 py-1 rounded text-xs">[TAG_NAME]</code>
+                    <code className="bg-muted px-2 py-1 rounded text-xs">{'<<FIELD_NAME>>'}</code>
+                    <code className="bg-muted px-2 py-1 rounded text-xs">{'{VALUE}'}</code>
+                    <code className="bg-muted px-2 py-1 rounded text-xs">@tag_name,</code>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Tags can be in tables, paragraphs, or footers. @ tags are comma or space terminated.
+                  </p>
                 </div>
               </TabsContent>
 
