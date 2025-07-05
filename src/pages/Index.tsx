@@ -1,9 +1,39 @@
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Sidebar } from "@/components/Sidebar";
 import { DashboardHome } from "@/components/DashboardHome";
+import { TemplateUpload } from "@/components/TemplateUpload";
+import { AIConfiguration } from "@/components/AIConfiguration";
+import { TagManager } from "@/components/TagManager";
+import { TagMappingInterface } from "@/components/TagMappingInterface";
+import { ConversionDashboard } from "@/components/ConversionDashboard";
+import { DocumentComparison } from "@/components/DocumentComparison";
+import { ReviewWorkflow } from "@/components/ReviewWorkflow";
 
 const Index = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const location = useLocation();
+
+  const renderContent = () => {
+    switch (location.pathname) {
+      case '/upload':
+        return <TemplateUpload />;
+      case '/ai-config':
+        return <AIConfiguration />;
+      case '/tags':
+        return <TagManager />;
+      case '/tag-mapping':
+        return <TagMappingInterface />;
+      case '/conversion':
+        return <ConversionDashboard />;
+      case '/compare':
+        return <DocumentComparison />;
+      case '/review':
+        return <ReviewWorkflow />;
+      default:
+        return <DashboardHome />;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-surface flex">
@@ -33,7 +63,7 @@ const Index = () => {
         {/* Main Content */}
         <main className="flex-1 overflow-auto">
           <div className="container mx-auto px-6 py-8">
-            <DashboardHome />
+            {renderContent()}
           </div>
         </main>
       </div>

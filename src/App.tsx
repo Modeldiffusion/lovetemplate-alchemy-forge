@@ -16,6 +16,13 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/upload" element={<Index />} />
+          <Route path="/ai-config" element={<Index />} />
+          <Route path="/tags" element={<Index />} />
+          <Route path="/tag-mapping" element={<Index />} />
+          <Route path="/conversion" element={<Index />} />
+          <Route path="/compare" element={<Index />} />
+          <Route path="/review" element={<Index />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
