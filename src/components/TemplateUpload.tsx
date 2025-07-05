@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Upload, File, X, CheckCircle2, AlertCircle, FileText } from "lucide-react";
+import { Upload, File, X, CheckCircle2, AlertCircle, FileText, Download, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useToast } from "@/hooks/use-toast";
@@ -18,14 +18,14 @@ interface UploadedFile {
   progress: number;
   tags?: string[];
   error?: string;
-  templateId?: string; // Add template ID for deletion
+  templateId?: string;
 }
 
 export const TemplateUpload = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadMode, setUploadMode] = useState<'single' | 'bulk'>('single');
-  const { templates, uploadTemplate, loading, error } = useTemplates();
+  const { uploadTemplate, deleteTemplate } = useTemplates();
   const { toast } = useToast();
 
   // Helper function to read file content as base64
@@ -34,7 +34,6 @@ export const TemplateUpload = () => {
       const reader = new FileReader();
       reader.onload = () => {
         if (reader.result) {
-          // Get the base64 string (remove the data URL prefix)
           const base64 = (reader.result as string).split(',')[1];
           resolve(base64);
         } else {
@@ -42,7 +41,6 @@ export const TemplateUpload = () => {
         }
       };
       reader.onerror = () => reject(new Error('Failed to read file'));
-      // Read as data URL to get proper base64 encoding for binary files
       reader.readAsDataURL(file);
     });
   };
@@ -53,6 +51,30 @@ export const TemplateUpload = () => {
       toast({
         title: "Single upload mode",
         description: "Switch to bulk mode to upload multiple files at once.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate file types
+    const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+    const invalidFiles = Array.from(fileList).filter(file => !validTypes.includes(file.type));
+    
+    if (invalidFiles.length > 0) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload only PDF, DOCX, or TXT files.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate file sizes (10MB limit)
+    const oversizedFiles = Array.from(fileList).filter(file => file.size > 10 * 1024 * 1024);
+    if (oversizedFiles.length > 0) {
+      toast({
+        title: "File too large",
+        description: "Please upload files smaller than 10MB.",
         variant: "destructive"
       });
       return;
@@ -118,7 +140,7 @@ export const TemplateUpload = () => {
           status: 'completed' as const,
           progress: 100,
           tags: ['uploaded', 'processed', 'ready-for-extraction'],
-          templateId: result.data.id // Store template ID for deletion
+          templateId: result.data.id
         };
 
         setFiles(prev => prev.map(f => 
@@ -127,27 +149,28 @@ export const TemplateUpload = () => {
         
         toast({
           title: "Upload successful",
-          description: `${file.name} has been uploaded and saved.`
+          description: `${file.name} has been uploaded and processed.`
         });
 
       } catch (err) {
+        console.error('Upload error:', err);
         setFiles(prev => prev.map(f => 
           f.id === uploadedFile.id ? {
             ...f,
             status: 'error',
             progress: 100,
-            error: 'Upload temporarily unavailable'
+            error: err instanceof Error ? err.message : 'Upload failed'
           } : f
         ));
         
         toast({
           title: "Upload failed",
-          description: `Failed to process ${file.name}. Please try again.`,
+          description: `Failed to process ${file.name}. ${err instanceof Error ? err.message : 'Please try again.'}`,
           variant: "destructive"
         });
       }
     }
-  }, [uploadMode, toast]);
+  }, [uploadMode, uploadTemplate, toast]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -172,21 +195,39 @@ export const TemplateUpload = () => {
     processFiles(selectedFiles);
   }, [processFiles]);
 
-
   const removeFile = (fileId: string) => {
     setFiles(prev => prev.filter(file => file.id !== fileId));
   };
 
-  const downloadTemplate = async (template: any) => {
+  const downloadTemplate = async (file: UploadedFile) => {
     try {
-      if (template.metadata?.content) {
-        // Create a downloadable file from the stored content
-        const content = template.metadata.extractedText || template.metadata.content;
+      if (file.templateId) {
+        // Get template data from Supabase
+        const { data: template, error } = await supabase
+          .from('templates')
+          .select('metadata')
+          .eq('id', file.templateId)
+          .single();
+
+        if (error || !template?.metadata) {
+          throw new Error('No template data available');
+        }
+
+        // Type cast metadata to access extractedText
+        const metadata = template.metadata as any;
+        const extractedText = metadata?.extractedText || metadata?.content;
+        
+        if (!extractedText) {
+          throw new Error('No extracted content available');
+        }
+
+        // Create a downloadable file
+        const content = typeof extractedText === 'string' ? extractedText : JSON.stringify(extractedText);
         const blob = new Blob([content], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${template.name.replace(/\.[^/.]+$/, '')}_extracted.txt`;
+        a.download = `${file.name.replace(/\.[^/.]+$/, '')}_extracted.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -194,19 +235,13 @@ export const TemplateUpload = () => {
         
         toast({
           title: "Download successful",
-          description: `Downloaded extracted content from ${template.name}`,
-        });
-      } else {
-        toast({
-          title: "Download failed", 
-          description: "No content available for download",
-          variant: "destructive"
+          description: `Downloaded extracted content from ${file.name}`,
         });
       }
     } catch (error) {
       toast({
         title: "Download failed",
-        description: "Failed to download file",
+        description: error instanceof Error ? error.message : "Failed to download file",
         variant: "destructive"
       });
     }
@@ -215,7 +250,7 @@ export const TemplateUpload = () => {
   const deleteUploadedFile = async (fileId: string, templateId?: string) => {
     try {
       if (templateId) {
-        await supabase.from('templates').delete().eq('id', templateId);
+        await deleteTemplate(templateId);
         toast({
           title: "File deleted",
           description: "Template has been deleted successfully",
@@ -242,44 +277,47 @@ export const TemplateUpload = () => {
   const getStatusIcon = (status: UploadedFile['status']) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle2 className="w-4 h-4 text-success" />;
+        return <CheckCircle2 className="w-4 h-4 text-green-500" />;
       case 'error':
-        return <AlertCircle className="w-4 h-4 text-destructive" />;
+        return <AlertCircle className="w-4 h-4 text-red-500" />;
       default:
-        return <FileText className="w-4 h-4 text-primary" />;
+        return <FileText className="w-4 h-4 text-blue-500" />;
     }
   };
 
   const getStatusColor = (status: UploadedFile['status']) => {
     switch (status) {
       case 'completed':
-        return 'bg-success text-success-foreground';
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       case 'error':
-        return 'bg-destructive text-destructive-foreground';
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
       case 'processing':
-        return 'bg-status-processing text-white';
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
       default:
-        return 'bg-warning text-warning-foreground';
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto px-4 py-6 space-y-6 max-w-6xl">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-foreground">Template Upload</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl lg:text-3xl font-bold text-foreground">Template Upload</h2>
+          <p className="text-sm lg:text-base text-muted-foreground mt-1">
             Upload templates for AI-powered tag extraction and conversion
-            {uploadMode === 'single' ? ' (Single file mode)' : ' (Bulk upload mode)'}
+            <span className="block lg:inline">
+              {uploadMode === 'single' ? ' (Single file mode)' : ' (Bulk upload mode)'}
+            </span>
           </p>
         </div>
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-2 p-1 bg-muted rounded-lg">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex items-center space-x-1 p-1 bg-muted rounded-lg">
             <Button
               variant={uploadMode === 'single' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setUploadMode('single')}
-              className="h-8"
+              className="h-8 flex-1 sm:flex-none"
             >
               Single
             </Button>
@@ -287,13 +325,13 @@ export const TemplateUpload = () => {
               variant={uploadMode === 'bulk' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setUploadMode('bulk')}
-              className="h-8"
+              className="h-8 flex-1 sm:flex-none"
             >
               Bulk
             </Button>
           </div>
           <Button 
-            className="bg-gradient-primary hover:shadow-glow"
+            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
             onClick={() => document.getElementById('file-upload')?.click()}
           >
             <Upload className="w-4 h-4 mr-2" />
@@ -303,30 +341,30 @@ export const TemplateUpload = () => {
       </div>
 
       {/* Upload Area */}
-      <Card className="bg-gradient-card shadow-custom-md">
-        <CardContent className="p-4 sm:p-8">
+      <Card className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 shadow-lg">
+        <CardContent className="p-4 sm:p-6 lg:p-8">
           <div
             className={cn(
-              "border-2 border-dashed rounded-lg p-4 sm:p-8 text-center transition-all duration-200",
+              "border-2 border-dashed rounded-lg p-6 sm:p-8 text-center transition-all duration-200",
               isDragging 
-                ? "border-primary bg-primary/5 shadow-glow" 
-                : "border-muted-foreground/25 hover:border-primary/50"
+                ? "border-blue-500 bg-blue-50 dark:bg-blue-950 shadow-lg" 
+                : "border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500"
             )}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           >
-            <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-gradient-primary rounded-full flex items-center justify-center mb-4">
-              <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-primary-foreground" />
+            <div className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
+              <Upload className="w-8 h-8 text-white" />
             </div>
-            <h3 className="text-base sm:text-lg font-semibold mb-2">
+            <h3 className="text-lg font-semibold mb-2">
               Drop {uploadMode === 'single' ? 'file' : 'files'} here or click to browse
             </h3>
             <p className="text-sm text-muted-foreground mb-4">
               Supports PDF, DOCX, TXT files up to 10MB each
-              <br className="hidden sm:block" />
-              <span className="block sm:inline">
-                {uploadMode === 'single' ? ' (single file)' : ' (multiple files allowed)'}
+              <br />
+              <span className="text-xs">
+                {uploadMode === 'single' ? 'Single file mode' : 'Multiple files allowed'}
               </span>
             </p>
             <input
@@ -338,7 +376,7 @@ export const TemplateUpload = () => {
               id="file-upload"
             />
             <label htmlFor="file-upload">
-              <Button variant="secondary" className="cursor-pointer text-sm sm:text-base">
+              <Button variant="secondary" className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
                 <File className="w-4 h-4 mr-2" />
                 Choose {uploadMode === 'single' ? 'File' : 'Files'}
               </Button>
@@ -349,23 +387,26 @@ export const TemplateUpload = () => {
 
       {/* File List */}
       {files.length > 0 && (
-        <Card className="bg-gradient-card shadow-custom-md">
+        <Card className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800 shadow-lg">
           <CardHeader>
-            <CardTitle>Uploaded Files ({files.length})</CardTitle>
-            <CardDescription>Processing status and extracted information</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Uploaded Files ({files.length})
+            </CardTitle>
+            <CardDescription>Processing status and file information</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {files.map((file) => (
-                <div key={file.id} className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 p-3 sm:p-4 border rounded-lg bg-card/50">
-                  <div className="flex-shrink-0 self-start sm:self-center">
+                <div key={file.id} className="flex flex-col lg:flex-row lg:items-center gap-4 p-4 border rounded-lg bg-card/50 hover:bg-card/80 transition-colors">
+                  <div className="flex-shrink-0">
                     {getStatusIcon(file.status)}
                   </div>
                   
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 space-y-1 sm:space-y-0">
-                      <p className="text-sm font-medium truncate pr-2">{file.name}</p>
-                      <div className="flex items-center space-x-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                      <p className="text-sm font-medium truncate">{file.name}</p>
+                      <div className="flex items-center gap-2">
                         <Badge 
                           variant="secondary" 
                           className={cn("text-xs", getStatusColor(file.status))}
@@ -376,23 +417,21 @@ export const TemplateUpload = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => downloadTemplate({ name: file.name, metadata: { extractedText: 'Sample extracted content for ' + file.name } })}
-                            className="h-6 w-6 p-0"
+                            onClick={() => downloadTemplate(file)}
+                            className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-900"
                             title="Download extracted content"
                           >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
+                            <Download className="w-4 h-4" />
                           </Button>
                         )}
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => removeFile(file.id)}
-                          className="h-6 w-6 p-0"
-                          title="Remove from list"
+                          onClick={() => deleteUploadedFile(file.id, file.templateId)}
+                          className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900"
+                          title="Delete file"
                         >
-                          <X className="w-3 h-3" />
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
                     </div>
@@ -405,7 +444,7 @@ export const TemplateUpload = () => {
                     <Progress value={file.progress} className="h-2 mb-2" />
                     
                     {file.tags && (
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1 mb-2">
                         {file.tags.map((tag, index) => (
                           <Badge key={index} variant="outline" className="text-xs">
                             {tag}
@@ -415,7 +454,7 @@ export const TemplateUpload = () => {
                     )}
                     
                     {file.error && (
-                      <p className="text-xs text-destructive mt-1">{file.error}</p>
+                      <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950 p-2 rounded">{file.error}</p>
                     )}
                   </div>
                 </div>
@@ -426,25 +465,25 @@ export const TemplateUpload = () => {
       )}
 
       {/* Upload Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-gradient-card shadow-custom-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-success">{files.filter(f => f.status === 'completed').length}</div>
-            <p className="text-xs text-muted-foreground">Successfully Processed</p>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{files.filter(f => f.status === 'completed').length}</div>
+            <p className="text-xs text-green-700 dark:text-green-300">Successfully Processed</p>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-card shadow-custom-sm">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-warning">{files.filter(f => f.status === 'processing' || f.status === 'uploading').length}</div>
-            <p className="text-xs text-muted-foreground">Currently Processing</p>
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{files.filter(f => f.status === 'processing' || f.status === 'uploading').length}</div>
+            <p className="text-xs text-blue-700 dark:text-blue-300">Currently Processing</p>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-card shadow-custom-sm">
+        <Card className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 border-red-200 dark:border-red-800">
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-destructive">{files.filter(f => f.status === 'error').length}</div>
-            <p className="text-xs text-muted-foreground">Failed Uploads</p>
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{files.filter(f => f.status === 'error').length}</div>
+            <p className="text-xs text-red-700 dark:text-red-300">Failed Uploads</p>
           </CardContent>
         </Card>
       </div>
