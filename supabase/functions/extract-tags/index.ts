@@ -130,50 +130,31 @@ serve(async (req) => {
           console.log('Successfully read file from storage, length:', templateContent.length);
         }
       } catch (storageError) {
-        console.log('Storage access failed, proceeding with demo content');
-        templateContent = createDemoContent(template.name, template.file_type);
+        console.log('Storage access failed, no content available');
+        templateContent = '';
       }
     } else {
-      // Create demo content for extraction to work
-      console.log('⚠️ No template content available, creating demo content for extraction');
-      templateContent = createDemoContent(template.name, template.file_type);
+      // No content available
+      console.log('⚠️ No template content available');
+      templateContent = '';
     }
 
-    // Ensure we have some content for extraction
+    // If no content is available, return empty result
     if (!templateContent || templateContent.length < 10) {
-      templateContent = createDemoContent(template.name, template.file_type);
-    }
-    
-    // Helper function to create demo content
-    function createDemoContent(fileName, fileType) {
-      const baseContent = `
-Document: ${fileName}
-Type: ${fileType}
-
-This is a sample document for tag extraction demonstration.
-
-Fields that might need extraction:
-[COMPANY_NAME] - The company name field
-[CLIENT_NAME] - Client or customer name  
-[DATE] - Document date
-[AMOUNT] - Currency amount or value
-[ADDRESS] - Address information
-[PHONE] - Phone number
-[EMAIL] - Email address
-[PROJECT_NAME] - Project or service name
-[REFERENCE_NUMBER] - Reference or ID number
-[DESCRIPTION] - Description or notes
-
-Additional placeholder tags:
-«ORGANIZATION» - Organization name in guillemets
-@department - Department with @ symbol
-<LOCATION> - Location in angle brackets
-{STATUS} - Status in curly braces
-
-Sample content with various tag formats for comprehensive extraction testing.
-      `.trim();
-      
-      return baseContent;
+      console.log('No content available for tag extraction');
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'No content available for tag extraction',
+          data: {
+            templateId,
+            tags: [],
+            totalTags: 0,
+            processingTime: '0.1s'
+          }
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log('Template content prepared, length:', templateContent.length);
