@@ -21,8 +21,9 @@ export const TemplateExtractionForm = () => {
   const { extractTags, loading } = useExtractedTags();
 
   const [regexPattern, setRegexPattern] = useState("");
-  const [startDelimiters, setStartDelimiters] = useState<string[]>(["[", "<<", "{", "@"]);
-  const [endDelimiters, setEndDelimiters] = useState<string[]>(["]", ">>", "}", ","]);
+  const [delimiterPairs, setDelimiterPairs] = useState<Array<{start: string, end: string}>>([
+    { start: '[', end: ']' }
+  ]);
   const [includeDelimiters, setIncludeDelimiters] = useState(true);
   const [extractionMethod, setExtractionMethod] = useState<"regex" | "delimiters">("delimiters");
 
@@ -61,17 +62,6 @@ export const TemplateExtractionForm = () => {
 
       // Now try the actual extraction
       for (const template of targetTemplates) {
-        // Convert delimiter arrays to delimiter pairs
-        const delimiterPairs = [];
-        
-        // Match start and end delimiters
-        for (let i = 0; i < Math.min(startDelimiters.length, endDelimiters.length); i++) {
-          delimiterPairs.push({
-            start: startDelimiters[i],
-            end: endDelimiters[i]
-          });
-        }
-        
         const extractionConfig = {
           delimiterPairs,
           includeDelimiters,
@@ -192,96 +182,71 @@ export const TemplateExtractionForm = () => {
               </TabsList>
 
               <TabsContent value="delimiters" className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Start Delimiters</Label>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {startDelimiters.map((delim, index) => (
-                        <Badge key={index} variant="outline" className="flex items-center gap-1">
-                          {delim === ' ' ? 'SPACE' : delim}
-                          <button
-                            onClick={() => setStartDelimiters(prev => prev.filter((_, i) => i !== index))}
-                            className="ml-1 text-red-500 hover:text-red-700"
+                    <Label>Custom Delimiter Pairs</Label>
+                    <div className="space-y-3">
+                      {delimiterPairs.map((pair, index) => (
+                        <div key={index} className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+                          <div className="flex items-center gap-2 flex-1">
+                            <Input
+                              placeholder="Start delimiter (e.g., [, <<, @)"
+                              value={pair.start}
+                              onChange={(e) => {
+                                const newPairs = [...delimiterPairs];
+                                newPairs[index].start = e.target.value;
+                                setDelimiterPairs(newPairs);
+                              }}
+                              className="w-32"
+                            />
+                            <span className="text-muted-foreground text-sm">...</span>
+                            <Input
+                              placeholder="End delimiter (e.g., ], >>, ,)"
+                              value={pair.end}
+                              onChange={(e) => {
+                                const newPairs = [...delimiterPairs];
+                                newPairs[index].end = e.target.value;
+                                setDelimiterPairs(newPairs);
+                              }}
+                              className="w-32"
+                            />
+                          </div>
+                          <Badge variant="outline" className="bg-background">
+                            {pair.start}TAG{pair.end}
+                          </Badge>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setDelimiterPairs(prev => prev.filter((_, i) => i !== index));
+                            }}
+                            className="text-red-500 hover:text-red-700"
                           >
                             ×
-                          </button>
-                        </Badge>
+                          </Button>
+                        </div>
                       ))}
                     </div>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Add delimiter"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            const value = (e.target as HTMLInputElement).value.trim();
-                            if (value && !startDelimiters.includes(value)) {
-                              setStartDelimiters(prev => [...prev, value]);
-                              (e.target as HTMLInputElement).value = '';
-                            }
-                          }
-                        }}
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          if (!startDelimiters.includes(' ')) {
-                            setStartDelimiters(prev => [...prev, ' ']);
-                          }
-                        }}
-                      >
-                        + Space
-                      </Button>
-                    </div>
+                    
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDelimiterPairs(prev => [...prev, { start: '', end: '' }]);
+                      }}
+                      className="mt-2"
+                    >
+                      + Add Delimiter Pair
+                    </Button>
+                    
                     <p className="text-xs text-muted-foreground">
-                      Characters that mark the beginning of tags
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>End Delimiters</Label>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {endDelimiters.map((delim, index) => (
-                        <Badge key={index} variant="outline" className="flex items-center gap-1">
-                          {delim === ' ' ? 'SPACE' : delim}
-                          <button
-                            onClick={() => setEndDelimiters(prev => prev.filter((_, i) => i !== index))}
-                            className="ml-1 text-red-500 hover:text-red-700"
-                          >
-                            ×
-                          </button>
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Add delimiter"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter') {
-                            const value = (e.target as HTMLInputElement).value.trim();
-                            if (value && !endDelimiters.includes(value)) {
-                              setEndDelimiters(prev => [...prev, value]);
-                              (e.target as HTMLInputElement).value = '';
-                            }
-                          }
-                        }}
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          if (!endDelimiters.includes(' ')) {
-                            setEndDelimiters(prev => [...prev, ' ']);
-                          }
-                        }}
-                      >
-                        + Space
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Characters that mark the end of tags
+                      Add custom delimiter pairs to extract tags. Examples: [tag], {'<<tag>>'}, {'{tag}'}, @tag (with comma/space)
                     </p>
                   </div>
                 </div>
+                
                 <div className="flex items-center space-x-2 mb-4">
                   <input
                     type="checkbox"
@@ -292,16 +257,18 @@ export const TemplateExtractionForm = () => {
                   />
                   <Label htmlFor="includeDelimitersForm">Include delimiters in extracted tags</Label>
                 </div>
+                
                 <div className="bg-muted/50 p-3 rounded-lg">
-                  <p className="text-sm font-medium mb-1">Supported formats:</p>
+                  <p className="text-sm font-medium mb-1">Current delimiter pairs will extract:</p>
                   <div className="flex flex-wrap gap-2 mb-2">
-                    <code className="bg-muted px-2 py-1 rounded text-xs">[TAG_NAME]</code>
-                    <code className="bg-muted px-2 py-1 rounded text-xs">{'<<FIELD_NAME>>'}</code>
-                    <code className="bg-muted px-2 py-1 rounded text-xs">{'{VALUE}'}</code>
-                    <code className="bg-muted px-2 py-1 rounded text-xs">@tag_name,</code>
+                    {delimiterPairs.filter(pair => pair.start && pair.end).map((pair, index) => (
+                      <code key={index} className="bg-muted px-2 py-1 rounded text-xs">
+                        {pair.start}TAG_NAME{pair.end}
+                      </code>
+                    ))}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Tags can be in tables, paragraphs, or footers. @ tags are comma or space terminated.
+                    Tags can be in tables, paragraphs, or footers. Use @ with comma/space for special tags.
                   </p>
                 </div>
               </TabsContent>
