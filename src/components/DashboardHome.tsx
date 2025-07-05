@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { FileText, Clock, CheckCircle2, BarChart3, TrendingUp, Users, Zap, AlertTriangle } from "lucide-react";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
+import { useNavigate } from "react-router-dom";
 
 export const DashboardHome = () => {
+  const navigate = useNavigate();
   const { templates } = useTemplates();
   const { extractedTags, tagMappings } = useExtractedTags();
   
@@ -200,7 +202,7 @@ export const DashboardHome = () => {
             <Button 
               variant="outline" 
               className="h-20 flex flex-col space-y-2"
-              onClick={() => window.location.href = '/upload'}
+              onClick={() => navigate('/upload')}
             >
               <FileText className="w-6 h-6" />
               <span className="text-sm">Upload Templates</span>
@@ -208,7 +210,7 @@ export const DashboardHome = () => {
             <Button 
               variant="outline" 
               className="h-20 flex flex-col space-y-2"
-              onClick={() => window.location.href = '/extraction'}
+              onClick={() => navigate('/extraction')}
             >
               <Zap className="w-6 h-6" />
               <span className="text-sm">Extract Tags</span>
@@ -216,7 +218,7 @@ export const DashboardHome = () => {
             <Button 
               variant="outline" 
               className="h-20 flex flex-col space-y-2"
-              onClick={() => window.location.href = '/tag-mapping'}
+              onClick={() => navigate('/tag-mapping')}
             >
               <CheckCircle2 className="w-6 h-6" />
               <span className="text-sm">Tag Mapping</span>
@@ -224,7 +226,7 @@ export const DashboardHome = () => {
             <Button 
               variant="outline" 
               className="h-20 flex flex-col space-y-2"
-              onClick={() => window.location.href = '/conversion'}
+              onClick={() => navigate('/conversion')}
             >
               <BarChart3 className="w-6 h-6" />
               <span className="text-sm">View Conversions</span>

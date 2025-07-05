@@ -21,9 +21,11 @@ const Index = () => {
 
   const renderContent = () => {
     const path = location.pathname;
+    console.log('Current path:', path); // Debug logging
     
     // Handle dynamic routes first
     if (path.startsWith('/extraction/') && path !== '/extraction') {
+      console.log('Rendering TemplateExtractionForm'); // Debug logging
       return <TemplateExtractionForm />;
     }
     
@@ -36,6 +38,7 @@ const Index = () => {
           </div>
         );
       case '/extraction':
+        console.log('Rendering TemplateExtractionGrid'); // Debug logging
         return <TemplateExtractionGrid />;
       case '/library':
         return <TemplateUpload />; // Reuse for now
@@ -88,6 +91,7 @@ const Index = () => {
       case '/notifications':
         return <DashboardHome />; // Placeholder
       default:
+        console.log('Rendering default DashboardHome'); // Debug logging
         return <DashboardHome />;
     }
   };

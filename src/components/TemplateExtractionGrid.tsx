@@ -18,6 +18,8 @@ export const TemplateExtractionGrid = () => {
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
   const navigate = useNavigate();
 
+  console.log('TemplateExtractionGrid rendered:', { templates: templates.length, loading, error }); // Debug logging
+
   const filteredTemplates = templates.filter(template =>
     template.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
