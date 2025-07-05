@@ -205,29 +205,32 @@ export const TemplateUpload = () => {
         // Get template data from Supabase
         const { data: template, error } = await supabase
           .from('templates')
-          .select('metadata')
+          .select('metadata, name')
           .eq('id', file.templateId)
           .single();
 
-        if (error || !template?.metadata) {
-          throw new Error('No template data available');
+        if (error) {
+          throw new Error('Template not found');
         }
 
-        // Type cast metadata to access extractedText
+        // Extract content from metadata
         const metadata = template.metadata as any;
-        const extractedText = metadata?.extractedText || metadata?.content;
+        let content = '';
         
-        if (!extractedText) {
-          throw new Error('No extracted content available');
+        if (metadata?.extractedText) {
+          content = metadata.extractedText;
+        } else if (metadata?.content) {
+          content = metadata.content;
+        } else {
+          throw new Error('No content available for download');
         }
 
-        // Create a downloadable file
-        const content = typeof extractedText === 'string' ? extractedText : JSON.stringify(extractedText);
+        // Create and download file
         const blob = new Blob([content], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${file.name.replace(/\.[^/.]+$/, '')}_extracted.txt`;
+        a.download = `${template.name.replace(/\.[^/.]+$/, '')}_extracted.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -235,10 +238,28 @@ export const TemplateUpload = () => {
         
         toast({
           title: "Download successful",
-          description: `Downloaded extracted content from ${file.name}`,
+          description: `Downloaded content from ${template.name}`,
+        });
+      } else {
+        // For files without template ID, create a simple text file
+        const content = `File: ${file.name}\nSize: ${formatFileSize(file.size)}\nType: ${file.type}\nStatus: ${file.status}`;
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${file.name}_info.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        toast({
+          title: "Download successful",
+          description: `Downloaded info for ${file.name}`,
         });
       }
     } catch (error) {
+      console.error('Download error:', error);
       toast({
         title: "Download failed",
         description: error instanceof Error ? error.message : "Failed to download file",
@@ -250,17 +271,28 @@ export const TemplateUpload = () => {
   const deleteUploadedFile = async (fileId: string, templateId?: string) => {
     try {
       if (templateId) {
-        await deleteTemplate(templateId);
+        const { error } = await supabase
+          .from('templates')
+          .delete()
+          .eq('id', templateId);
+          
+        if (error) {
+          throw new Error(error.message);
+        }
+        
         toast({
           title: "File deleted",
           description: "Template has been deleted successfully",
         });
       }
+      
+      // Remove from local state
       setFiles(prev => prev.filter(file => file.id !== fileId));
     } catch (error) {
+      console.error('Delete error:', error);
       toast({
         title: "Delete failed",
-        description: "Failed to delete the file",
+        description: error instanceof Error ? error.message : "Failed to delete the file",
         variant: "destructive"
       });
     }

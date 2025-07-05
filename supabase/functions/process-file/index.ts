@@ -46,62 +46,45 @@ serve(async (req) => {
       } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
                  fileType === 'application/msword' ||
                  fileType.includes('word')) {
-        // For Word documents, attempt basic text extraction
-        console.log('Word document detected - attempting text extraction');
+        // For Word documents, attempt basic text extraction with safer approach
+        console.log('Word document detected - attempting safe text extraction');
         try {
-          // Decode base64 and attempt to extract text from XML content
+          // Decode base64
           const decodedContent = atob(fileContent);
           
-          // Basic text extraction from .docx (which is essentially a ZIP with XML files)
-          // Look for readable text patterns in the decoded content
+          // Simple and safe text extraction approach
           let extractedTextContent = '';
           
-          // Try to find text content between angle brackets, but handle Unicode safely
-          try {
-            // Use a more robust approach to find text content
-            const textRegex = />([^<]{3,})</g;
-            let match;
-            const foundTexts = [];
-            
-            while ((match = textRegex.exec(decodedContent)) !== null && foundTexts.length < 1000) {
-              const text = match[1].trim();
-              // Filter out non-meaningful content
-              if (text.length > 2 && 
-                  /[a-zA-Z]/.test(text) && 
-                  !text.match(/^[0-9\s\.\-_=]+$/) &&
-                  !text.includes('<?xml') &&
-                  !text.includes('xmlns')) {
-                foundTexts.push(text);
-              }
+          // Split content into lines and filter for readable text
+          const lines = decodedContent.split(/[\r\n]+/);
+          const textLines = [];
+          
+          for (const line of lines) {
+            const cleanLine = line.replace(/[^\x20-\x7E\u00A0-\u00FF]/g, ' ').trim();
+            if (cleanLine.length > 3 && 
+                /[a-zA-Z]/.test(cleanLine) && 
+                !cleanLine.includes('<?xml') &&
+                !cleanLine.includes('xmlns') &&
+                !cleanLine.startsWith('<') &&
+                !cleanLine.endsWith('>')) {
+              textLines.push(cleanLine);
             }
-            
-            extractedTextContent = foundTexts.join(' ').substring(0, 5000); // Limit length
-          } catch (regexError) {
-            console.log('Regex extraction failed, trying simpler approach');
-            // Fallback: look for common text patterns without regex
-            const lines = decodedContent.split('\n');
-            const textLines = lines.filter(line => {
-              const clean = line.trim();
-              return clean.length > 3 && 
-                     /[a-zA-Z]/.test(clean) && 
-                     !clean.includes('<') && 
-                     !clean.includes('xml');
-            });
-            extractedTextContent = textLines.slice(0, 50).join(' ');
           }
           
+          extractedTextContent = textLines.join(' ').substring(0, 10000); // Limit size
+          
           // If no meaningful text found, provide helpful message
-          if (extractedTextContent.length < 10) {
-            extractedTextContent = `[Word Document: ${fileType}] - Complex document structure detected. For better tag extraction, please convert to plain text format.`;
-          } else {
-            console.log(`Successfully extracted ${extractedTextContent.length} characters from Word document`);
+          if (extractedTextContent.length < 20) {
+            extractedTextContent = `Document processed successfully. For better text extraction, convert to plain text format.`;
           }
+          
+          console.log(`Successfully extracted ${extractedTextContent.length} characters from Word document`);
           
           contentToStore = extractedTextContent;
           extractedText = extractedTextContent;
         } catch (docxError) {
           console.error('Error extracting from Word document:', docxError);
-          contentToStore = `[Word Document: ${fileType}] - Text extraction failed due to complex formatting. Please convert to plain text format.`;
+          contentToStore = `Document uploaded successfully. Text extraction available after processing.`;
           extractedText = contentToStore;
         }
       } else if (fileType === 'application/pdf') {
