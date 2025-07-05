@@ -12,7 +12,7 @@ import type { Template } from "@/hooks/useTemplates";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-import { ManualTagExtraction } from "@/components/ManualTagExtraction";
+
 
 export const TemplateExtractionGrid = () => {
   const { templates, loading, error, refetch } = useTemplates();
@@ -128,15 +128,9 @@ export const TemplateExtractionGrid = () => {
         </div>
       </div>
 
-      {/* Tabs for different extraction methods */}
-      <Tabs defaultValue="upload" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="upload">Upload & Extract</TabsTrigger>
-          <TabsTrigger value="manual">Paste & Extract</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="upload" className="space-y-6">
-          {/* Search */}
+      {/* Template extraction interface */}
+      <div className="space-y-6">
+        {/* Search */}
           <Card className="bg-gradient-card shadow-custom-sm">
             <CardContent className="p-4">
               <div className="relative">
@@ -247,12 +241,7 @@ export const TemplateExtractionGrid = () => {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-        
-        <TabsContent value="manual">
-          <ManualTagExtraction />
-        </TabsContent>
-      </Tabs>
+        </div>
     </div>
   );
 };
