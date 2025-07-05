@@ -26,6 +26,8 @@ const App = () => (
             <Route path="/versions" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/ai-config" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/tag-extraction" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/extraction" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/extraction/:templateId" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/batch-processing" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/tags" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/tag-mapping" element={<ProtectedRoute><Index /></ProtectedRoute>} />
