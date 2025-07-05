@@ -57,9 +57,19 @@ export class TagExtractor {
   static extractTags(templateContent: string, config: ExtractionConfig): ExtractedTagResult[] {
     console.log('Step 6: Building extraction regex...');
     
-    // Default delimiter configuration
+    // Default delimiter configuration - support multiple common delimiter types
     const defaultConfig: ExtractionConfig = {
-      delimiterPairs: [{ start: '[', end: ']' }],
+      delimiterPairs: [
+        { start: '[', end: ']' },           // Square brackets
+        { start: '«', end: '»' },           // Guillemets
+        { start: '<<', end: '>>' },         // Double angle brackets  
+        { start: '<', end: '>' },           // Single angle brackets
+        { start: '{', end: '}' },           // Curly braces
+        { start: '{{', end: '}}' },         // Double curly braces
+        { start: '(', end: ')' },           // Parentheses
+        { start: '__', end: '__' },         // Double underscores
+        { start: '**', end: '**' }          // Double asterisks
+      ],
       caseSensitive: false,
       includeDelimiters: true
     };
@@ -118,8 +128,8 @@ export class TagExtractor {
       const end = Math.min(templateContent.length, match.index + match[0].length + 30);
       const context = templateContent.substring(start, end).trim();
 
-      // Determine pattern/category based on tag content
-      let pattern = `${startDelim}...${endDelim || ''} placeholder`;
+      // Determine pattern/category based on tag content and delimiters
+      let pattern = `${startDelim}...${endDelim || ''} tag`;
       let confidence = 85;
 
       // Special handling for @ tags
@@ -127,28 +137,28 @@ export class TagExtractor {
         pattern = '@tag (comma/space terminated)';
         confidence = 90;
       } else if (tagContent.includes('DATE')) {
-        pattern = 'Date placeholder';
+        pattern = 'Date field';
         confidence = 95;
       } else if (tagContent.includes('NAME')) {
-        pattern = 'Name placeholder';
+        pattern = 'Name field';
         confidence = 90;
       } else if (tagContent.includes('EMAIL')) {
-        pattern = 'Email placeholder';
+        pattern = 'Email field';
         confidence = 95;
       } else if (tagContent.includes('PHONE')) {
-        pattern = 'Phone placeholder';
+        pattern = 'Phone field';
         confidence = 90;
       } else if (tagContent.includes('ADDRESS')) {
-        pattern = 'Address placeholder';
+        pattern = 'Address field';
         confidence = 90;
       } else if (tagContent.includes('VALUE') || tagContent.includes('AMOUNT')) {
-        pattern = 'Currency/Value placeholder';
+        pattern = 'Currency/Value field';
         confidence = 90;
       } else if (tagContent.includes('NUMBER')) {
-        pattern = 'Number placeholder';
+        pattern = 'Number field';
         confidence = 85;
       } else if (tagContent.includes('COMPANY')) {
-        pattern = 'Company information placeholder';
+        pattern = 'Company information field';
         confidence = 95;
       }
 
