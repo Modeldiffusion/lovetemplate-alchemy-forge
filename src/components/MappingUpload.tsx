@@ -74,12 +74,46 @@ export const MappingUpload = () => {
     
     Papa.parse(file, {
       header: true,
+      skipEmptyLines: true,
+      transformHeader: (header) => {
+        // Normalize header names to match our expected format
+        const normalized = header.trim().toLowerCase();
+        if (normalized.includes('tag') && normalized.includes('name')) return 'tagName';
+        if (normalized.includes('mapping') && normalized.includes('field')) return 'mappingField';
+        if (normalized.includes('custom') && normalized.includes('mapping')) return 'customMapping';
+        if (normalized.includes('applicable') && normalized.includes('document')) return 'applicableDocuments';
+        if (normalized.includes('status')) return 'status';
+        if (normalized.includes('active')) return 'active';
+        return header; // Keep original if no match
+      },
       complete: (results) => {
+        console.log('CSV parse results:', results);
+        
+        if (results.errors && results.errors.length > 0) {
+          console.error('CSV parsing errors:', results.errors);
+          toast.error(`CSV parsing errors: ${results.errors.map(e => e.message).join(', ')}`);
+          return;
+        }
+        
         const parsed = results.data as MappingData[];
+        console.log('Parsed CSV data:', parsed);
+        
+        if (parsed.length === 0) {
+          toast.error("No valid data found in CSV file");
+          return;
+        }
+        
         const validatedData = parsed.map(row => validateMappingRow(row));
+        console.log('Validated data:', validatedData);
         setParsedData(validatedData);
+        
+        const validCount = validatedData.filter(row => row.isValid).length;
+        const invalidCount = validatedData.filter(row => !row.isValid).length;
+        
+        toast.success(`Parsed ${parsed.length} rows: ${validCount} valid, ${invalidCount} invalid`);
       },
       error: (error) => {
+        console.error('CSV parsing error:', error);
         toast.error(`Error parsing CSV: ${error.message}`);
       }
     });
@@ -88,29 +122,49 @@ export const MappingUpload = () => {
   const validateMappingRow = (row: MappingData): ParsedMapping => {
     const errors: string[] = [];
     
-    if (!row.tagName || row.tagName.trim() === '') {
-      errors.push('Tag Name is required');
+    console.log('Validating row:', row);
+    
+    // Check if tagName exists and is not empty
+    if (!row.tagName || typeof row.tagName !== 'string' || row.tagName.trim() === '') {
+      errors.push('Tag Name is required and cannot be empty');
     }
     
-    if (!row.mappingField || row.mappingField.trim() === '') {
-      errors.push('Mapping Field is required');
+    // Check if mappingField exists and is not empty
+    if (!row.mappingField || typeof row.mappingField !== 'string' || row.mappingField.trim() === '') {
+      errors.push('Mapping Field is required and cannot be empty');
     }
     
-    // Accept any status value or default to 'mapped' if not provided
-    if (row.status && !['mapped', 'unmapped', 'validated', 'error', 'logic'].includes(row.status.toLowerCase())) {
-      errors.push('Invalid status value. Valid options: mapped, unmapped, validated, error, logic');
+    // Make status validation more flexible - accept empty/undefined status
+    if (row.status && typeof row.status === 'string' && row.status.trim() !== '') {
+      const validStatuses = ['mapped', 'unmapped', 'validated', 'error', 'logic'];
+      if (!validStatuses.includes(row.status.toLowerCase().trim())) {
+        errors.push(`Invalid status value: "${row.status}". Valid options: ${validStatuses.join(', ')}`);
+      }
     }
     
-    // Accept any active value or default to 'yes' if not provided
-    if (row.active && !['yes', 'no', 'true', 'false', '1', '0'].includes(row.active.toLowerCase())) {
-      errors.push('Invalid active value. Valid options: yes, no, true, false, 1, 0');
+    // Make active validation more flexible - accept empty/undefined active
+    if (row.active && typeof row.active === 'string' && row.active.trim() !== '') {
+      const validActiveValues = ['yes', 'no', 'true', 'false', '1', '0'];
+      if (!validActiveValues.includes(row.active.toLowerCase().trim())) {
+        errors.push(`Invalid active value: "${row.active}". Valid options: ${validActiveValues.join(', ')}`);
+      }
     }
 
-    return {
+    const result = {
       ...row,
+      // Set defaults for missing values
+      tagName: row.tagName || '',
+      mappingField: row.mappingField || '',
+      customMapping: row.customMapping || '',
+      applicableDocuments: row.applicableDocuments || '',
+      status: row.status || 'mapped',
+      active: row.active || 'yes',
       isValid: errors.length === 0,
       errors
     };
+    
+    console.log('Validation result:', result);
+    return result;
   };
 
   const applyMappings = async () => {
@@ -306,11 +360,12 @@ export const MappingUpload = () => {
                       <TableHead>Mapping Field</TableHead>
                       <TableHead>Custom Mapping</TableHead>
                       <TableHead>Documents</TableHead>
+                      <TableHead>Errors</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {parsedData.map((row, index) => (
-                      <TableRow key={index}>
+                      <TableRow key={index} className={row.isValid ? '' : 'bg-red-50'}>
                         <TableCell>
                           {row.isValid ? (
                             <CheckCircle2 className="w-4 h-4 text-green-600" />
@@ -324,6 +379,15 @@ export const MappingUpload = () => {
                           {row.customMapping || 'None'}
                         </TableCell>
                         <TableCell className="text-sm">{row.applicableDocuments}</TableCell>
+                        <TableCell className="text-sm">
+                          {row.errors.length > 0 && (
+                            <div className="text-red-600">
+                              {row.errors.map((error, i) => (
+                                <div key={i} className="text-xs">{error}</div>
+                              ))}
+                            </div>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
