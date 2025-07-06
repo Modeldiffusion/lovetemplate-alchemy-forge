@@ -49,16 +49,20 @@ export const TemplateGrid = () => {
 
   const handleView = async (template: Template) => {
     console.log('View clicked for template:', template);
+    console.log('Template metadata:', template.metadata);
     try {
       if (template.metadata && typeof template.metadata === 'object') {
         const metadata = template.metadata as any;
+        console.log('Metadata content:', metadata);
         const content = metadata.extractedText || metadata.content || 'No content available';
+        console.log('Content to show:', content.substring(0, 100) + '...');
         
         // Create a simple modal-like display using alert for now
         // In a real app, you'd want to use a proper modal component
         const preview = content.length > 500 ? content.substring(0, 500) + '...' : content;
         alert(`Template: ${template.name}\n\nContent Preview:\n${preview}`);
       } else {
+        console.log('No metadata found for template');
         toast({
           title: "No content available",
           description: "This template doesn't have processed content to view",
@@ -124,16 +128,23 @@ export const TemplateGrid = () => {
 
   const handleDelete = async (template: Template) => {
     console.log('Delete clicked for template:', template);
+    console.log('Template ID:', template.id);
+    
     if (!confirm(`Are you sure you want to delete "${template.name}"? This action cannot be undone.`)) {
+      console.log('Delete cancelled by user');
       return;
     }
 
+    console.log('User confirmed delete, proceeding...');
     try {
+      console.log('Calling deleteTemplate function...');
       await deleteTemplate(template.id);
+      console.log('Delete successful, showing success toast');
       toast({
         title: "Template deleted",
         description: `${template.name} has been deleted successfully`,
       });
+      console.log('Refreshing template list...');
       refetch(); // Refresh the list
     } catch (error) {
       console.error('Delete error:', error);
