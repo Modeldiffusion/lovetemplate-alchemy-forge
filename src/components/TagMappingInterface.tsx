@@ -100,21 +100,29 @@ export const TagMappingInterface = () => {
       let effectiveMappingField = '';
       let mappingStatus: 'mapped' | 'unmapped' | 'error' = 'unmapped';
       
-      if (hasDocLevelMapping && docLevelValue) {
+      // Check if any mapping exists (field mapping, custom mapping, or doc level mapping)
+      const hasFieldMapping = existingMapping?.internal_tag_id || uniqueMapping;
+      const hasCustomMapping = customValue.trim() !== '';
+      const hasDocLevelMappingValue = docLevelValue.trim() !== '';
+      
+      if (hasDocLevelMappingValue) {
         // Document level mapping has highest precedence
         mappingStatus = 'mapped';
-      } else if (existingMapping?.internal_tag_id) {
-        // Direct internal tag mapping
-        effectiveMappingField = existingMapping.internal_tag_id;
+      } else if (hasFieldMapping) {
+        // Field mapping exists
+        if (existingMapping?.internal_tag_id) {
+          effectiveMappingField = existingMapping.internal_tag_id;
+        } else if (uniqueMapping) {
+          effectiveMappingField = uniqueMapping.id;
+        }
         mappingStatus = 'mapped';
-      } else if (uniqueMapping) {
-        // Fallback to unique tag library mapping
-        effectiveMappingField = uniqueMapping.id;
+      } else if (hasCustomMapping) {
+        // Only custom mapping exists
         mappingStatus = 'mapped';
       }
       
-      // If there's custom mapping but no other mapping, still consider it mapped
-      if (!mappingStatus && customValue) {
+      // If ANY mapping exists, consider it mapped
+      if (hasFieldMapping || hasCustomMapping || hasDocLevelMappingValue) {
         mappingStatus = 'mapped';
       }
       

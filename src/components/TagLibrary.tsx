@@ -16,7 +16,8 @@ import {
   Filter,
   ChevronDown,
   Download,
-  Plus
+  Plus,
+  AlertCircle
 } from "lucide-react";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { useUploadedFields } from "@/hooks/useUploadedFields";
@@ -95,13 +96,28 @@ export const TagLibrary = () => {
         ? internalTags.find(it => it.id === mapping.internal_tag_id)
         : null;
 
-      // Extract custom mapping from mapping_logic if it contains custom logic
+      // Extract custom mapping from mapping_logic with better parsing
       let customMapping = null;
-      if (mapping?.mapping_logic && mapping.mapping_logic.includes('Custom logic:')) {
-        const customPart = mapping.mapping_logic.split('Custom logic:')[1];
-        if (customPart) {
-          customMapping = customPart.replace(/^\s*\|\s*/, '').trim();
+      if (mapping?.mapping_logic) {
+        if (mapping.mapping_logic.includes('Custom logic:')) {
+          const customPart = mapping.mapping_logic.split('Custom logic:')[1];
+          if (customPart) {
+            customMapping = customPart.replace(/^\s*\|\s*/, '').trim();
+          }
+        } else if (mapping.mapping_logic.includes('Custom:')) {
+          customMapping = mapping.mapping_logic.replace('Custom: ', '').trim();
         }
+      }
+
+      // Calculate status based on all mapping types
+      let mappingStatus: 'unmapped' | 'mapped' | 'logic' | 'validated' | 'error' = 'unmapped';
+      const hasFieldMapping = !!internalTag;
+      const hasCustomMapping = !!customMapping;
+      
+      if (hasFieldMapping || hasCustomMapping) {
+        mappingStatus = hasCustomMapping ? 'logic' : 'mapped';
+      } else if (mapping?.status) {
+        mappingStatus = mapping.status as 'unmapped' | 'mapped' | 'logic' | 'validated' | 'error';
       }
 
       processedData.push({
@@ -110,7 +126,7 @@ export const TagLibrary = () => {
         mappingField: internalTag?.name || null,
         customMapping,
         applicableDocuments: Array.from(group.documents),
-        mappingStatus: mapping?.status || 'unmapped',
+        mappingStatus: mappingStatus,
         isActive: true, // Default to active, could be stored in DB
         extractedTagId: representativeTag.id,
         internalTagId: mapping?.internal_tag_id || null
@@ -290,16 +306,14 @@ export const TagLibrary = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="bg-gradient-card shadow-custom-sm">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Database className="w-5 h-5 text-blue-600" />
-              </div>
+            <div className="flex items-center space-x-2">
+              <Database className="w-5 h-5 text-primary" />
               <div>
-                <p className="text-sm text-muted-foreground">Total Tags</p>
-                <p className="text-xl font-bold">{tagLibraryData.length}</p>
+                <div className="text-2xl font-bold">{tagLibraryData.length}</div>
+                <p className="text-xs text-muted-foreground">Total Tags</p>
               </div>
             </div>
           </CardContent>
@@ -307,15 +321,13 @@ export const TagLibrary = () => {
 
         <Card className="bg-gradient-card shadow-custom-sm">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Database className="w-5 h-5 text-green-600" />
-              </div>
+            <div className="flex items-center space-x-2">
+              <FileText className="w-5 h-5 text-success" />
               <div>
-                <p className="text-sm text-muted-foreground">Mapped</p>
-                <p className="text-xl font-bold">
+                <div className="text-2xl font-bold">
                   {tagLibraryData.filter(t => t.mappingStatus === 'mapped' || t.mappingStatus === 'validated').length}
-                </p>
+                </div>
+                <p className="text-xs text-muted-foreground">Field Mapped</p>
               </div>
             </div>
           </CardContent>
@@ -323,15 +335,27 @@ export const TagLibrary = () => {
 
         <Card className="bg-gradient-card shadow-custom-sm">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Database className="w-5 h-5 text-yellow-600" />
-              </div>
+            <div className="flex items-center space-x-2">
+              <Edit className="w-5 h-5 text-accent" />
               <div>
-                <p className="text-sm text-muted-foreground">Unmapped</p>
-                <p className="text-xl font-bold">
+                <div className="text-2xl font-bold">
+                  {tagLibraryData.filter(t => t.mappingStatus === 'logic').length}
+                </div>
+                <p className="text-xs text-muted-foreground">Custom Logic</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card shadow-custom-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="w-5 h-5 text-warning" />
+              <div>
+                <div className="text-2xl font-bold">
                   {tagLibraryData.filter(t => t.mappingStatus === 'unmapped').length}
-                </p>
+                </div>
+                <p className="text-xs text-muted-foreground">Unmapped</p>
               </div>
             </div>
           </CardContent>
@@ -339,15 +363,13 @@ export const TagLibrary = () => {
 
         <Card className="bg-gradient-card shadow-custom-sm">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Database className="w-5 h-5 text-green-600" />
-              </div>
+            <div className="flex items-center space-x-2">
+              <Database className="w-5 h-5 text-secondary" />
               <div>
-                <p className="text-sm text-muted-foreground">Active</p>
-                <p className="text-xl font-bold">
+                <div className="text-2xl font-bold">
                   {tagLibraryData.filter(t => t.isActive).length}
-                </p>
+                </div>
+                <p className="text-xs text-muted-foreground">Active</p>
               </div>
             </div>
           </CardContent>
