@@ -262,24 +262,45 @@ export const TagMappingInterface = () => {
 
   const handleSaveMappings = async () => {
     try {
+      console.log('Starting to save mappings...');
+      
       for (const mapping of templateMappings) {
         if (mapping.extractedTagId) {
+          console.log('Processing mapping for tag:', mapping.tagName, mapping);
+          
           const existing = tagMappings.find(m => m.extracted_tag_id === mapping.extractedTagId);
           
+          // Build mapping logic more carefully
+          let mappingLogic = null;
+          if (mapping.customMappingDocLevel?.trim()) {
+            mappingLogic = `DocLevel: ${mapping.customMappingDocLevel.trim()}`;
+          } else if (mapping.customMapping?.trim()) {
+            mappingLogic = `Custom: ${mapping.customMapping.trim()}`;
+          }
+          
+          // Determine proper status
+          let status = 'unmapped';
+          if (mapping.mappingField || mappingLogic) {
+            status = 'mapped';
+          }
+          
           const updates = {
-            internal_tag_id: mapping.mappingField,
-            mapping_logic: mapping.customMapping ? `Custom: ${mapping.customMapping}` : 
-                          mapping.customMappingDocLevel ? `DocLevel: ${mapping.customMappingDocLevel}` : null,
-            status: mapping.mappingStatus
+            internal_tag_id: mapping.mappingField?.trim() || null,
+            mapping_logic: mappingLogic,
+            status: status
           };
           
+          console.log('Updates to apply:', updates);
+          
           if (existing) {
+            console.log('Updating existing mapping:', existing.id);
             await updateTagMapping(existing.id, updates);
-          } else if (mapping.mappingField || mapping.customMapping || mapping.customMappingDocLevel) {
+          } else if (mapping.mappingField || mappingLogic) {
+            console.log('Creating new mapping for extracted_tag_id:', mapping.extractedTagId);
             await createTagMapping({
               extracted_tag_id: mapping.extractedTagId,
-              internal_tag_id: mapping.mappingField,
-              mapping_logic: updates.mapping_logic,
+              internal_tag_id: mapping.mappingField?.trim() || null,
+              mapping_logic: mappingLogic,
               confidence: 80
             });
           }
@@ -287,7 +308,9 @@ export const TagMappingInterface = () => {
       }
       toast.success("Mappings saved successfully");
     } catch (error) {
-      toast.error("Failed to save mappings");
+      console.error("Error saving mappings:", error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      toast.error(`Failed to save mappings: ${errorMessage}`);
     }
   };
 
