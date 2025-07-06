@@ -296,23 +296,23 @@ export const TagLibrary = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Database className="w-8 h-8 text-primary" />
+        <Database className="w-6 h-6 text-primary" />
         <div>
-          <h3 className="text-2xl font-bold text-foreground">Tag Library</h3>
-          <p className="text-muted-foreground">
+          <h3 className="text-lg font-bold text-foreground">Tag Library</h3>
+          <p className="text-sm text-muted-foreground">
             Manage and view all extracted tags from your documents
           </p>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
         <Card className="bg-gradient-card shadow-custom-sm">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center space-x-2">
-              <Database className="w-5 h-5 text-primary" />
+              <Database className="w-4 h-4 text-primary" />
               <div>
-                <div className="text-2xl font-bold">{tagLibraryData.length}</div>
+                <div className="text-lg font-bold">{tagLibraryData.length}</div>
                 <p className="text-xs text-muted-foreground">Total Tags</p>
               </div>
             </div>
@@ -320,11 +320,11 @@ export const TagLibrary = () => {
         </Card>
 
         <Card className="bg-gradient-card shadow-custom-sm">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center space-x-2">
-              <FileText className="w-5 h-5 text-success" />
+              <FileText className="w-4 h-4 text-success" />
               <div>
-                <div className="text-2xl font-bold">
+                <div className="text-lg font-bold">
                   {tagLibraryData.filter(t => t.mappingStatus === 'mapped' || t.mappingStatus === 'validated').length}
                 </div>
                 <p className="text-xs text-muted-foreground">Field Mapped</p>

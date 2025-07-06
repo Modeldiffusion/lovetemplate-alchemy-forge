@@ -17,14 +17,21 @@ import { useNavigate } from "react-router-dom";
 export const TemplateExtractionGrid = () => {
   const { templates, loading, error, refetch } = useTemplates();
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
   const navigate = useNavigate();
 
   console.log('TemplateExtractionGrid rendered:', { templates: templates.length, loading, error }); // Debug logging
 
-  const filteredTemplates = templates.filter(template =>
-    template.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTemplates = templates.filter(template => {
+    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === "all" || template.status === statusFilter;
+    const matchesType = typeFilter === "all" || template.file_type === typeFilter;
+    return matchesSearch && matchesStatus && matchesType;
+  });
+
+  const uniqueFileTypes = Array.from(new Set(templates.map(t => t.file_type).filter(Boolean)));
 
   const getStatusColor = (status: Template['status']) => {
     switch (status) {
@@ -119,11 +126,11 @@ export const TemplateExtractionGrid = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-2xl font-bold text-foreground">Tag Extraction</h3>
-          <p className="text-muted-foreground">Extract tags from uploaded templates or paste content directly</p>
+          <h3 className="text-lg font-bold text-foreground">Tag Extraction</h3>
+          <p className="text-sm text-muted-foreground">Extract tags from uploaded templates or paste content directly</p>
         </div>
         <div className="flex gap-2">
           <Button 
@@ -149,18 +156,47 @@ export const TemplateExtractionGrid = () => {
       </div>
 
       {/* Template extraction interface */}
-      <div className="space-y-6">
-        {/* Search */}
+      <div className="space-y-4">
+        {/* Filters */}
           <Card className="bg-gradient-card shadow-custom-sm">
-            <CardContent className="p-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search templates..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+            <CardContent className="p-3">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search templates..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 h-9"
+                    />
+                  </div>
+                </div>
+                <div className="w-full sm:w-36">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-background h-9 text-sm"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="uploaded">Uploaded</option>
+                    <option value="processing">Processing</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                  </select>
+                </div>
+                <div className="w-full sm:w-36">
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-background h-9 text-sm"
+                  >
+                    <option value="all">All Types</option>
+                    {uniqueFileTypes.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -129,14 +129,12 @@ export const TemplateConversion = () => {
       // Process each tag according to the conversion logic
       const processedTags: ConversionResult[] = templateTags.map(tag => {
         const mapping = tagMappings.find(m => m.extracted_tag_id === tag.id);
-        const uniqueMapping = internalTags.find(internal => 
-          internal.name.toLowerCase() === tag.text.toLowerCase()
-        );
+        
+        console.log('Processing tag:', tag.text, 'mapping:', mapping);
 
         // Check for document level mapping first (highest priority)
-        const hasDocLevelMapping = mapping?.mapping_logic?.includes('DocLevel:');
-        if (hasDocLevelMapping) {
-          const docLevelValue = mapping.mapping_logic.replace('DocLevel: ', '').trim();
+        if (mapping?.mapping_logic?.includes('DocLevel:')) {
+          const docLevelValue = mapping.mapping_logic.split('DocLevel:')[1]?.trim();
           if (docLevelValue) {
             return {
               original: tag.text,
@@ -147,13 +145,10 @@ export const TemplateConversion = () => {
           }
         }
 
-        // Check for unique tag library mapping (field mapping)
-        if (mapping?.internal_tag_id || uniqueMapping) {
-          const internalTag = internalTags.find(t => 
-            t.id === mapping?.internal_tag_id || t.id === uniqueMapping?.id
-          );
-          
-          if (internalTag) {
+        // Check for direct internal tag mapping (field mapping)
+        if (mapping?.internal_tag_id) {
+          const internalTag = internalTags.find(t => t.id === mapping.internal_tag_id);
+          if (internalTag && internalTag.name) {
             return {
               original: tag.text,
               replacement: internalTag.name,
@@ -163,19 +158,27 @@ export const TemplateConversion = () => {
           }
         }
 
-        // Check for custom mapping (lowest priority after field mapping)
+        // Check for custom mapping logic
         if (mapping?.mapping_logic) {
           let customValue = '';
-          if (mapping.mapping_logic.includes('Custom:')) {
-            customValue = mapping.mapping_logic.replace('Custom: ', '').trim();
+          
+          // Handle different custom mapping formats
+          if (mapping.mapping_logic.includes('Custom:') && !mapping.mapping_logic.includes('DocLevel:')) {
+            customValue = mapping.mapping_logic.replace('Custom:', '').trim();
           } else if (mapping.mapping_logic.includes('Custom logic:')) {
-            const customPart = mapping.mapping_logic.split('Custom logic:')[1];
-            if (customPart) {
-              customValue = customPart.replace(/^\s*\|\s*/, '').trim();
+            const parts = mapping.mapping_logic.split('Custom logic:');
+            if (parts[1]) {
+              customValue = parts[1].replace(/^\s*\|\s*/, '').trim();
+            }
+          } else if (mapping.mapping_logic.includes('Field mapped to:')) {
+            // Extract field name from mapping logic
+            const fieldPart = mapping.mapping_logic.replace('Field mapped to:', '').trim();
+            if (fieldPart) {
+              customValue = fieldPart;
             }
           }
           
-          if (customValue) {
+          if (customValue && customValue !== '') {
             return {
               original: tag.text,
               replacement: customValue,
@@ -183,6 +186,20 @@ export const TemplateConversion = () => {
               replaced: true
             };
           }
+        }
+
+        // Check for unique field name matching (fallback)
+        const uniqueMapping = internalTags.find(internal => 
+          internal.name && internal.name.toLowerCase() === tag.text.toLowerCase()
+        );
+        
+        if (uniqueMapping) {
+          return {
+            original: tag.text,
+            replacement: uniqueMapping.name,
+            type: 'field-mapping' as const,
+            replaced: true
+          };
         }
 
         // Retain original tag if no mapping found
@@ -433,22 +450,22 @@ Status: ${template.status}`;
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-foreground">Template Conversion</h2>
-          <p className="text-muted-foreground">Convert templates by replacing tags with mapped values</p>
+          <h2 className="text-lg font-bold text-foreground">Template Conversion</h2>
+          <p className="text-sm text-muted-foreground">Convert templates by replacing tags with mapped values</p>
         </div>
       </div>
 
       {/* Dashboard Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <Card className="bg-gradient-card shadow-custom-sm">
-          <CardContent className="p-4">
+          <CardContent className="p-3">
             <div className="flex items-center space-x-2">
-              <FileText className="w-5 h-5 text-primary" />
+              <FileText className="w-4 h-4 text-primary" />
               <div>
-                <div className="text-2xl font-bold">{conversionData.length}</div>
+                <div className="text-lg font-bold">{conversionData.length}</div>
                 <p className="text-xs text-muted-foreground">Total Templates</p>
               </div>
             </div>
