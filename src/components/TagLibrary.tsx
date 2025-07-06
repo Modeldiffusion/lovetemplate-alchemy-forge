@@ -11,7 +11,8 @@ import {
   Database,
   FileText,
   Filter,
-  ChevronDown
+  ChevronDown,
+  Download
 } from "lucide-react";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { toast } from "sonner";
@@ -118,6 +119,39 @@ export const TagLibrary = () => {
   const handleEdit = (tagId: string) => {
     // Navigate to edit page or open edit modal
     toast.info("Edit functionality will be implemented");
+  };
+
+  const handleExport = () => {
+    if (filteredData.length === 0) {
+      toast.error("No tags to export");
+      return;
+    }
+
+    // Create CSV content
+    const headers = ['Tag Name', 'Mapping Field', 'Applicable Documents', 'Status', 'Active'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredData.map(item => [
+        `"${item.tagName}"`,
+        `"${item.mappingField || 'Not mapped'}"`,
+        `"${item.applicableDocuments.join('; ')}"`,
+        `"${getStatusLabel(item.mappingStatus)}"`,
+        `"${item.isActive ? 'Yes' : 'No'}"`
+      ].join(','))
+    ].join('\n');
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `tag-library-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`Exported ${filteredData.length} tags successfully`);
   };
 
   const filteredData = tagLibraryData.filter(item => {
@@ -270,13 +304,27 @@ export const TagLibrary = () => {
       {/* Tags Table */}
       <Card className="bg-gradient-card shadow-custom-md">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            Tag Library ({filteredData.length} items)
-          </CardTitle>
-          <CardDescription>
-            Manage extracted tags and their mappings across all documents
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Tag Library ({filteredData.length} items)
+              </CardTitle>
+              <CardDescription>
+                Manage extracted tags and their mappings across all documents
+              </CardDescription>
+            </div>
+            <Button
+              onClick={handleExport}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+              disabled={filteredData.length === 0}
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
