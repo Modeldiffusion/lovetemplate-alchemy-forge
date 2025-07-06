@@ -9,10 +9,13 @@ import { useTemplates } from "@/hooks/useTemplates";
 import type { Template } from "@/hooks/useTemplates";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export const TemplateGrid = () => {
-  const { templates, loading, error, refetch } = useTemplates();
+  const { templates, loading, error, refetch, deleteTemplate } = useTemplates();
   const [searchTerm, setSearchTerm] = useState("");
+  const { toast } = useToast();
 
   const filteredTemplates = templates.filter(template =>
     template.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -42,6 +45,104 @@ export const TemplateGrid = () => {
 
   const formatDate = (dateString: string) => {
     return format(new Date(dateString), 'MMM d, yyyy h:mm a');
+  };
+
+  const handleView = async (template: Template) => {
+    console.log('View clicked for template:', template);
+    try {
+      if (template.metadata && typeof template.metadata === 'object') {
+        const metadata = template.metadata as any;
+        const content = metadata.extractedText || metadata.content || 'No content available';
+        
+        // Create a simple modal-like display using alert for now
+        // In a real app, you'd want to use a proper modal component
+        const preview = content.length > 500 ? content.substring(0, 500) + '...' : content;
+        alert(`Template: ${template.name}\n\nContent Preview:\n${preview}`);
+      } else {
+        toast({
+          title: "No content available",
+          description: "This template doesn't have processed content to view",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('View error:', error);
+      toast({
+        title: "View failed",
+        description: "Failed to view template content",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDownload = async (template: Template) => {
+    console.log('Download clicked for template:', template);
+    try {
+      if (template.metadata && typeof template.metadata === 'object') {
+        const metadata = template.metadata as any;
+        let content = '';
+        
+        if (metadata.extractedText) {
+          content = metadata.extractedText;
+        } else if (metadata.content) {
+          content = metadata.content;
+        } else {
+          throw new Error('No content available for download');
+        }
+
+        // Create and download file
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${template.name.replace(/\.[^/.]+$/, '')}_extracted.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        toast({
+          title: "Download successful",
+          description: `Downloaded content from ${template.name}`,
+        });
+      } else {
+        toast({
+          title: "No content available",
+          description: "This template doesn't have processed content to download",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      toast({
+        title: "Download failed",
+        description: error instanceof Error ? error.message : "Failed to download file",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDelete = async (template: Template) => {
+    console.log('Delete clicked for template:', template);
+    if (!confirm(`Are you sure you want to delete "${template.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteTemplate(template.id);
+      toast({
+        title: "Template deleted",
+        description: `${template.name} has been deleted successfully`,
+      });
+      refetch(); // Refresh the list
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast({
+        title: "Delete failed",
+        description: error instanceof Error ? error.message : "Failed to delete template",
+        variant: "destructive"
+      });
+    }
   };
 
   if (loading) {
@@ -163,16 +264,30 @@ export const TemplateGrid = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end space-x-1">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleView(template)}
+                            title="View template content"
+                          >
                             <Eye className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleDownload(template)}
+                            title="Download template content"
+                          >
                             <Download className="w-4 h-4" />
                           </Button>
                           <Button 
                             variant="ghost" 
                             size="sm" 
                             className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            onClick={() => handleDelete(template)}
+                            title="Delete template"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
