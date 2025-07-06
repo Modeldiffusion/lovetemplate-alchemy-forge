@@ -160,9 +160,15 @@ export const TagMappingInterface = () => {
           mappingStatus = 'mapped';
         }
         
-        // If ANY mapping exists, consider it mapped
-        if (hasFieldMapping || hasCustomMapping || hasDocLevelMappingValue) {
+        // Determine final status based on what mappings exist
+        if (hasDocLevelMappingValue) {
           mappingStatus = 'mapped';
+        } else if (hasFieldMapping) {
+          mappingStatus = 'mapped';
+        } else if (hasCustomMapping) {
+          mappingStatus = 'mapped';
+        } else {
+          mappingStatus = 'unmapped';
         }
         
         console.log(`Tag ${tag.text}:`, {
@@ -610,20 +616,22 @@ export const TagMappingInterface = () => {
                   </TableCell>
                   
                   <TableCell>
-                    <Input
+                   <Input
                       placeholder="Custom mapping..."
                       value={mapping.customMapping || ''}
                       onChange={(e) => handleCustomMappingChange(mapping.id, e.target.value)}
                       className="w-48"
+                      disabled={false}
                     />
                   </TableCell>
                   
                   <TableCell>
-                    <Input
+                   <Input
                       placeholder="Document level mapping..."
                       value={mapping.customMappingDocLevel || ''}
                       onChange={(e) => handleCustomMappingChange(mapping.id, e.target.value, true)}
                       className="w-48"
+                      disabled={false}
                     />
                   </TableCell>
                   

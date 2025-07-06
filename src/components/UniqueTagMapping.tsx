@@ -202,7 +202,7 @@ export const UniqueTagMapping = () => {
         }
       }
 
-      const status = tagItem.mappingField ? 'mapped' : 'logic';
+      const status = tagItem.mappingField || editingCustomValue.trim() ? 'mapped' : 'unmapped';
 
       if (tagItem.mappingId) {
         // Update existing mapping

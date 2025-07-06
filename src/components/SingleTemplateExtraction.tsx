@@ -14,6 +14,7 @@ import { useTemplates } from "@/hooks/useTemplates";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { Pagination } from "@/components/ui/pagination-table";
 
 export const SingleTemplateExtraction = () => {
   const { templateId } = useParams<{ templateId: string }>();
@@ -452,49 +453,19 @@ export const SingleTemplateExtraction = () => {
             </div>
 
             {extractedTags.length > 0 && (
-              <div className="space-y-4">
-                <h4 className="font-medium">Extracted Tags:</h4>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                   {extractedTags.slice(0, 20).map((tag, index) => (
-                     <div key={tag.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                       <span className="font-medium">{tag.text}</span>
-                       <div className="flex items-center space-x-2">
-                         <Badge variant={tag.confidence > 80 ? "default" : "secondary"} className="text-xs">
-                           {tag.confidence}%
-                         </Badge>
-                         <span className="text-xs text-muted-foreground">pos: {tag.position}</span>
-                         <Button
-                           variant="ghost"
-                           size="sm"
-                           onClick={async () => {
-                             try {
-                               await deleteExtractedTag(tag.id);
-                               toast({
-                                 title: "Tag deleted",
-                                 description: `Tag "${tag.text}" has been removed`,
-                               });
-                             } catch (error) {
-                               toast({
-                                 title: "Delete failed",
-                                 description: error instanceof Error ? error.message : "Failed to delete tag",
-                                 variant: "destructive"
-                               });
-                             }
-                           }}
-                           className="text-red-500 hover:text-red-700 h-6 w-6 p-0"
-                         >
-                           <Trash2 className="w-3 h-3" />
-                         </Button>
-                       </div>
-                     </div>
-                   ))}
-                </div>
-                {extractedTags.length > 20 && (
-                  <p className="text-sm text-muted-foreground text-center">
-                    And {extractedTags.length - 20} more tags...
-                  </p>
-                )}
-              </div>
+              <ExtractionResultsTable 
+                extractedTags={extractedTags} 
+                onDeleteTag={deleteExtractedTag}
+                onTagDeleted={(tagText) => toast({
+                  title: "Tag deleted",
+                  description: `Tag "${tagText}" has been removed`,
+                })}
+                onDeleteError={(error) => toast({
+                  title: "Delete failed",
+                  description: error instanceof Error ? error.message : "Failed to delete tag",
+                  variant: "destructive"
+                })}
+              />
             )}
 
             <div className="flex justify-center mt-6 space-x-4">
@@ -569,6 +540,71 @@ export const SingleTemplateExtraction = () => {
             </div>
           </CardContent>
         </Card>
+      )}
+    </div>
+  );
+};
+
+// Extraction Results Table Component with Pagination
+interface ExtractionResultsTableProps {
+  extractedTags: any[];
+  onDeleteTag: (tagId: string) => Promise<void>;
+  onTagDeleted: (tagText: string) => void;
+  onDeleteError: (error: any) => void;
+}
+
+const ExtractionResultsTable = ({ extractedTags, onDeleteTag, onTagDeleted, onDeleteError }: ExtractionResultsTableProps) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedTags = extractedTags.slice(startIndex, startIndex + pageSize);
+  
+  const handleDelete = async (tag: any) => {
+    try {
+      await onDeleteTag(tag.id);
+      onTagDeleted(tag.text);
+    } catch (error) {
+      onDeleteError(error);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <h4 className="font-medium">Extracted Tags:</h4>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+        {paginatedTags.map((tag) => (
+          <div key={tag.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+            <span className="font-medium">{tag.text}</span>
+            <div className="flex items-center space-x-2">
+              <Badge variant={tag.confidence > 80 ? "default" : "secondary"} className="text-xs">
+                {tag.confidence}%
+              </Badge>
+              <span className="text-xs text-muted-foreground">pos: {tag.position}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDelete(tag)}
+                className="text-red-500 hover:text-red-700 h-6 w-6 p-0"
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {extractedTags.length > pageSize && (
+        <Pagination
+          totalItems={extractedTags.length}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+        />
       )}
     </div>
   );
