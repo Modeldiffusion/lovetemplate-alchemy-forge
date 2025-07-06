@@ -15,6 +15,7 @@ import { TemplateExtractionGrid } from "@/components/TemplateExtractionGrid";
 import { TemplateExtractionForm } from "@/components/TemplateExtractionForm";
 import { TagLibrary } from "@/components/TagLibrary";
 import { SingleTemplateExtraction } from "@/components/SingleTemplateExtraction";
+import { MappingInterface } from "@/components/MappingInterface";
 
 const Index = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -61,6 +62,8 @@ const Index = () => {
         return <TagManager />;
       case '/tag-mapping':
         return <TagMappingInterface />;
+      case '/mapping':
+        return <MappingInterface />;
       case '/tag-analytics':
         return <DashboardHome />; // Placeholder
       case '/conversion':

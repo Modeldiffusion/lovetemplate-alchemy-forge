@@ -28,7 +28,8 @@ import {
   FileSearch,
   UserCheck,
   Clock,
-  Zap
+  Zap,
+  MapPin
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +51,7 @@ const menuItems: MenuItem[] = [
       { id: "upload", label: "Upload Templates", icon: Upload, path: "/upload" },
       { id: "extraction", label: "Extract Tags", icon: Target, path: "/extraction" },
       { id: "tag-library", label: "Tag Library", icon: Database, path: "/tag-library" },
+      { id: "mapping", label: "Mapping", icon: MapPin, path: "/mapping" },
       { id: "library", label: "Template Library", icon: Archive, path: "/library" },
       { id: "versions", label: "Version Control", icon: GitBranch, path: "/versions" },
     ]

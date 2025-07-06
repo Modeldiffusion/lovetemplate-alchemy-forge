@@ -15,6 +15,8 @@ import {
   Download
 } from "lucide-react";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
+import { useUploadedFields } from "@/hooks/useUploadedFields";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
 interface TagLibraryItem {
@@ -29,10 +31,19 @@ interface TagLibraryItem {
 }
 
 export const TagLibrary = () => {
-  const { extractedTags, tagMappings, internalTags, loading } = useExtractedTags();
+  const { extractedTags, tagMappings, internalTags, loading, createTagMapping, updateTagMapping } = useExtractedTags();
+  const { getAllFieldNames, loading: fieldsLoading } = useUploadedFields();
   const [tagLibraryData, setTagLibraryData] = useState<TagLibraryItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [availableFields, setAvailableFields] = useState<string[]>([]);
+
+  // Load available fields
+  useEffect(() => {
+    if (!fieldsLoading) {
+      setAvailableFields(getAllFieldNames());
+    }
+  }, [fieldsLoading, getAllFieldNames]);
 
   // Process the data to create tag library items
   useEffect(() => {
@@ -100,6 +111,30 @@ export const TagLibrary = () => {
       case 'logic': return 'Logic Applied';
       case 'error': return 'Error';
       default: return 'Unmapped';
+    }
+  };
+
+  const handleFieldMapping = async (tagId: string, extractedTagId: string, fieldName: string) => {
+    try {
+      // Create a new tag mapping with the selected field
+      await createTagMapping({
+        extracted_tag_id: extractedTagId,
+        mapping_logic: `Field mapped to: ${fieldName}`,
+        confidence: 95
+      });
+
+      // Update local state
+      setTagLibraryData(prev => 
+        prev.map(item => 
+          item.id === tagId 
+            ? { ...item, mappingField: fieldName, mappingStatus: 'mapped' as const }
+            : item
+        )
+      );
+      
+      toast.success(`Tag "${tagLibraryData.find(t => t.id === tagId)?.tagName}" mapped to "${fieldName}"`);
+    } catch (error) {
+      toast.error("Failed to create field mapping");
     }
   };
 
@@ -362,6 +397,22 @@ export const TagLibrary = () => {
                           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                             {item.mappingField}
                           </Badge>
+                        ) : availableFields.length > 0 ? (
+                          <Select
+                            value=""
+                            onValueChange={(value) => handleFieldMapping(item.id, item.extractedTagId, value)}
+                          >
+                            <SelectTrigger className="w-48">
+                              <SelectValue placeholder="Select field..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableFields.map((field) => (
+                                <SelectItem key={field} value={field}>
+                                  {field}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         ) : (
                           <span className="text-muted-foreground">Not mapped</span>
                         )}

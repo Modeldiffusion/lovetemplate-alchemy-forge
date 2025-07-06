@@ -32,6 +32,7 @@ const App = () => (
             <Route path="/batch-processing" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/tags" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/tag-mapping" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/mapping" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/tag-analytics" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/conversion" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/compare" element={<ProtectedRoute><Index /></ProtectedRoute>} />

@@ -56,6 +56,38 @@ export type Database = {
           },
         ]
       }
+      field_names: {
+        Row: {
+          created_at: string
+          field_name: string
+          file_id: string
+          id: string
+          position: number | null
+        }
+        Insert: {
+          created_at?: string
+          field_name: string
+          file_id: string
+          id?: string
+          position?: number | null
+        }
+        Update: {
+          created_at?: string
+          field_name?: string
+          file_id?: string
+          id?: string
+          position?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_names_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "uploaded_field_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       internal_tags: {
         Row: {
           category: string
@@ -216,6 +248,39 @@ export type Database = {
           status?: string
           tags?: string[] | null
           updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string
+        }
+        Relationships: []
+      }
+      uploaded_field_files: {
+        Row: {
+          file_path: string | null
+          file_size: number | null
+          file_type: string
+          id: string
+          name: string
+          status: string
+          uploaded_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          file_path?: string | null
+          file_size?: number | null
+          file_type: string
+          id?: string
+          name: string
+          status?: string
+          uploaded_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          file_path?: string | null
+          file_size?: number | null
+          file_type?: string
+          id?: string
+          name?: string
+          status?: string
           uploaded_at?: string
           uploaded_by?: string
         }
