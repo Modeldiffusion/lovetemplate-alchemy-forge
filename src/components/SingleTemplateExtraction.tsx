@@ -79,9 +79,10 @@ export const SingleTemplateExtraction = () => {
       setExtractionStatus('completed');
       setExtractionResults(results);
       
+      const totalExtracted = results?.totalTags || extractedTags.length;
       toast({
         title: "Extraction completed",
-        description: `Successfully extracted ${results?.totalTags || extractedTags.length} tags from ${template?.name}`,
+        description: `Total ${totalExtracted} Extracted. Please check the tag library for Extracted Tag details`,
       });
       
     } catch (error) {

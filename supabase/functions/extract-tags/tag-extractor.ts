@@ -20,7 +20,7 @@ export class TagExtractor {
     // Escape special regex characters properly, including Unicode characters
     const escapeRegex = (str: string) => {
       // Handle Unicode characters like « and » by escaping them properly
-      return str.replace(/[.*+?^${}()|[\]\\«»]/g, '\\$&');
+      return str.replace(/[.*+?^${}()|[\]\\«»<>]/g, '\\$&');
     };
     
     const patterns = [];
@@ -30,17 +30,44 @@ export class TagExtractor {
       .filter(pair => pair.start && pair.end)
       .map(pair => {
         const startEscaped = escapeRegex(pair.start);
-        const endEscaped = pair.end === ' ' ? '\\s+' : escapeRegex(pair.end);
+        let endEscaped;
         
-        // Support mixed case tags like tag_Name or TAG_NAME
-        return `(${startEscaped})([A-Za-z_][A-Za-z0-9_]*)(${endEscaped})`;
+        if (pair.end === ' ') {
+          endEscaped = '\\s+';
+        } else if (pair.end === ',') {
+          endEscaped = ',';
+        } else {
+          endEscaped = escapeRegex(pair.end);
+        }
+        
+        // Support mixed case tags, including spaces in tag content for << >> format
+        if (pair.start === '<<' || pair.start === '<') {
+          return `(${startEscaped})\\s*([A-Za-z_][A-Za-z0-9_\\s]*)\\s*(${endEscaped})`;
+        } else {
+          return `(${startEscaped})([A-Za-z_][A-Za-z0-9_]*)(${endEscaped})`;
+        }
       });
     
     patterns.push(...pairPatterns);
     
-    // Add @ tag pattern (comma or space terminated, or end of line)
-    // @tagname followed by comma, space, or end of string/line
+    // Add common document tag patterns that might not be in delimiter pairs
+    // Unicode guillemets pattern: «TAG»
+    patterns.push('(«)([A-Za-z_][A-Za-z0-9_]*)(»)');
+    
+    // @ tag pattern @TAG@ (enclosed)
+    patterns.push('(@)([A-Za-z_][A-Za-z0-9_]*)(@)');
+    
+    // @ tag pattern (space/comma terminated)
     patterns.push('(@)([A-Za-z_][A-Za-z0-9_]*)(?=[ ,\\n\\t\\r]|$)');
+    
+    // Double angle brackets: << TAG >>
+    patterns.push('(<<)\\s*([A-Za-z_][A-Za-z0-9_\\s]*)\\s*(>>)');
+    
+    // Square brackets: [TAG]
+    patterns.push('(\\[)([A-Za-z_][A-Za-z0-9_]*)(\\])');
+    
+    // Curly braces: {TAG}
+    patterns.push('(\\{)([A-Za-z_][A-Za-z0-9_]*)(\\})');
     
     if (patterns.length === 0) {
       // Fallback to default if no valid patterns
@@ -51,7 +78,7 @@ export class TagExtractor {
     const combinedPattern = patterns.join('|');
     const flags = caseSensitive ? 'g' : 'gi';
     
-    return new RegExp(combinedPattern, flags);
+    return new RegExp('(' + combinedPattern + ')', flags);
   }
 
   static extractTags(templateContent: string, config: ExtractionConfig): ExtractedTagResult[] {
@@ -79,19 +106,38 @@ export class TagExtractor {
     while ((match = tagRegex.exec(templateContent)) !== null) {
       const fullMatch = match[0]; // Full match including delimiters
       
-      // Handle different capture groups based on pattern type
+      // Handle different capture groups - find non-empty groups
       let startDelim = '';
       let tagContent = '';
       let endDelim = '';
       
-      // Find which capture groups are populated
-      for (let i = 1; i < match.length; i += 3) {
+      // Skip the first group (full match) and find populated groups
+      for (let i = 2; i < match.length; i += 3) {
         if (match[i] && match[i + 1]) {
           startDelim = match[i];
           tagContent = match[i + 1];
           endDelim = match[i + 2] || '';
           break;
         }
+      }
+      
+      // If we didn't find groups in the expected pattern, try alternative parsing
+      if (!startDelim && !tagContent) {
+        // Look for any sequence of 3 consecutive non-null groups
+        for (let i = 1; i < match.length - 2; i++) {
+          if (match[i] && match[i + 1] && (match[i + 2] || match[i + 1].trim())) {
+            startDelim = match[i];
+            tagContent = match[i + 1].trim();
+            endDelim = match[i + 2] || '';
+            break;
+          }
+        }
+      }
+      
+      // Skip if we couldn't parse the tag
+      if (!tagContent) {
+        console.log('Could not parse tag from match:', match);
+        continue;
       }
       
       // For @ tags, if no explicit end delimiter is captured, use comma or space
