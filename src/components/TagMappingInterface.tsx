@@ -16,7 +16,8 @@ import {
   Download,
   Plus,
   Save,
-  Wand2
+  Wand2,
+  Trash2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
@@ -59,6 +60,8 @@ export const TagMappingInterface = () => {
     tagMappings,
     createTagMapping,
     updateTagMapping,
+    deleteExtractedTag,
+    refetch
   } = useExtractedTags(selectedDocument === "all" ? undefined : selectedDocument);
 
   // Handle template selection from URL parameters
@@ -558,6 +561,7 @@ export const TagMappingInterface = () => {
                 <TableHead>Custom Mapping - Document Level</TableHead>
                 <TableHead>Mapping Status</TableHead>
                 <TableHead>Active / Inactive</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -643,6 +647,30 @@ export const TagMappingInterface = () => {
                       checked={mapping.isActive}
                       onCheckedChange={() => handleActiveToggle(mapping.id)}
                     />
+                  </TableCell>
+                  
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      {mapping.extractedTagId && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              await deleteExtractedTag(mapping.extractedTagId);
+                              // Remove from local state
+                              setTemplateMappings(prev => prev.filter(m => m.id !== mapping.id));
+                              toast.success(`Tag "${mapping.tagName}" deleted successfully`);
+                            } catch (error) {
+                              toast.error(error instanceof Error ? error.message : "Failed to delete tag");
+                            }
+                          }}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

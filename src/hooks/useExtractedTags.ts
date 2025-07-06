@@ -279,6 +279,33 @@ export const useExtractedTags = (templateId?: string) => {
     }
   };
 
+  const deleteExtractedTag = async (tagId: string) => {
+    try {
+      // First delete any mappings for this tag
+      const { error: mappingError } = await supabase
+        .from('tag_mappings')
+        .delete()
+        .eq('extracted_tag_id', tagId);
+
+      if (mappingError) throw mappingError;
+
+      // Then delete the extracted tag
+      const { error } = await supabase
+        .from('extracted_tags')
+        .delete()
+        .eq('id', tagId);
+
+      if (error) throw error;
+      
+      // Update local state
+      setExtractedTags(prev => prev.filter(tag => tag.id !== tagId));
+      setTagMappings(prev => prev.filter(mapping => mapping.extracted_tag_id !== tagId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete extracted tag');
+      throw err;
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -304,6 +331,7 @@ export const useExtractedTags = (templateId?: string) => {
     updateTagMapping,
     createInternalTag,
     createManualTag,
+    deleteExtractedTag,
     refetch: () => {
       fetchExtractedTags();
       fetchInternalTags();

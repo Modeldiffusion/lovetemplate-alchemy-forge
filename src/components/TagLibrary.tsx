@@ -17,7 +17,8 @@ import {
   ChevronDown,
   Download,
   Plus,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from "lucide-react";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { useUploadedFields } from "@/hooks/useUploadedFields";
@@ -39,7 +40,7 @@ interface TagLibraryItem {
 }
 
 export const TagLibrary = () => {
-  const { extractedTags, tagMappings, internalTags, loading, createTagMapping, updateTagMapping, createInternalTag, createManualTag, refetch } = useExtractedTags();
+  const { extractedTags, tagMappings, internalTags, loading, createTagMapping, updateTagMapping, createInternalTag, createManualTag, deleteExtractedTag, refetch } = useExtractedTags();
   const { getAllFieldNames, loading: fieldsLoading } = useUploadedFields();
   const { templates } = useTemplates();
   const [tagLibraryData, setTagLibraryData] = useState<TagLibraryItem[]>([]);
@@ -209,6 +210,24 @@ export const TagLibrary = () => {
   const handleEdit = (tagId: string) => {
     // Navigate to edit page or open edit modal
     toast.info("Edit functionality will be implemented");
+  };
+
+  const handleDeleteTag = async (item: TagLibraryItem) => {
+    try {
+      // Find all extracted tags with the same text (since TagLibrary groups by text)
+      const tagsToDelete = extractedTags.filter(tag => 
+        tag.text.toLowerCase() === item.tagName.toLowerCase()
+      );
+
+      // Delete each tag
+      for (const tag of tagsToDelete) {
+        await deleteExtractedTag(tag.id);
+      }
+
+      toast.success(`Deleted all instances of tag "${item.tagName}"`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete tag");
+    }
   };
 
   const handleManualTagAdd = async () => {
@@ -687,17 +706,25 @@ export const TagLibrary = () => {
                           onCheckedChange={() => handleToggleActive(item.id, item.isActive)}
                         />
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(item.id)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                       <TableCell>
+                         <div className="flex items-center gap-2">
+                           <Button
+                             variant="ghost"
+                             size="sm"
+                             onClick={() => handleEdit(item.id)}
+                           >
+                             <Edit className="w-4 h-4" />
+                           </Button>
+                           <Button
+                             variant="ghost"
+                             size="sm"
+                             onClick={() => handleDeleteTag(item)}
+                             className="text-red-500 hover:text-red-700"
+                           >
+                             <Trash2 className="w-4 h-4" />
+                           </Button>
+                         </div>
+                       </TableCell>
                     </TableRow>
                   ))
                 )}

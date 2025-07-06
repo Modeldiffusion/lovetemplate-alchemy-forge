@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, FileText, Zap, CheckCircle2, AlertCircle, RefreshCw, Target, Plus } from "lucide-react";
+import { ArrowLeft, FileText, Zap, CheckCircle2, AlertCircle, RefreshCw, Target, Plus, Trash2 } from "lucide-react";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +19,7 @@ export const SingleTemplateExtraction = () => {
   const { templateId } = useParams<{ templateId: string }>();
   const navigate = useNavigate();
   const { templates } = useTemplates();
-  const { extractTags, extractedTags, loading, createManualTag } = useExtractedTags(templateId);
+  const { extractTags, extractedTags, loading, createManualTag, deleteExtractedTag } = useExtractedTags(templateId);
   const { toast } = useToast();
   
   const [extractionStatus, setExtractionStatus] = useState<'idle' | 'extracting' | 'completed' | 'error'>('idle');
@@ -454,18 +454,40 @@ export const SingleTemplateExtraction = () => {
             {extractedTags.length > 0 && (
               <div className="space-y-4">
                 <h4 className="font-medium">Extracted Tags:</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {extractedTags.slice(0, 20).map((tag, index) => (
-                    <div key={tag.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                      <span className="font-medium">{tag.text}</span>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant={tag.confidence > 80 ? "default" : "secondary"} className="text-xs">
-                          {tag.confidence}%
-                        </Badge>
-                        <span className="text-xs text-muted-foreground">pos: {tag.position}</span>
-                      </div>
-                    </div>
-                  ))}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                   {extractedTags.slice(0, 20).map((tag, index) => (
+                     <div key={tag.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                       <span className="font-medium">{tag.text}</span>
+                       <div className="flex items-center space-x-2">
+                         <Badge variant={tag.confidence > 80 ? "default" : "secondary"} className="text-xs">
+                           {tag.confidence}%
+                         </Badge>
+                         <span className="text-xs text-muted-foreground">pos: {tag.position}</span>
+                         <Button
+                           variant="ghost"
+                           size="sm"
+                           onClick={async () => {
+                             try {
+                               await deleteExtractedTag(tag.id);
+                               toast({
+                                 title: "Tag deleted",
+                                 description: `Tag "${tag.text}" has been removed`,
+                               });
+                             } catch (error) {
+                               toast({
+                                 title: "Delete failed",
+                                 description: error instanceof Error ? error.message : "Failed to delete tag",
+                                 variant: "destructive"
+                               });
+                             }
+                           }}
+                           className="text-red-500 hover:text-red-700 h-6 w-6 p-0"
+                         >
+                           <Trash2 className="w-3 h-3" />
+                         </Button>
+                       </div>
+                     </div>
+                   ))}
                 </div>
                 {extractedTags.length > 20 && (
                   <p className="text-sm text-muted-foreground text-center">
