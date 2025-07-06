@@ -46,6 +46,7 @@ export const TemplateUpload = () => {
   };
 
   const processFiles = useCallback(async (fileList: File[]) => {
+    console.log('processFiles called with:', fileList);
     // Validate file count based on mode
     if (uploadMode === 'single' && fileList.length > 1) {
       toast({
@@ -208,12 +209,16 @@ export const TemplateUpload = () => {
     e.preventDefault();
     setIsDragging(false);
     
+    console.log('File dropped:', e.dataTransfer.files);
     const droppedFiles = Array.from(e.dataTransfer.files);
+    console.log('Processing dropped files:', droppedFiles);
     processFiles(droppedFiles);
   }, [processFiles]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('Files selected:', e.target.files);
     const selectedFiles = Array.from(e.target.files || []);
+    console.log('Processing selected files:', selectedFiles);
     processFiles(selectedFiles);
   }, [processFiles]);
 
