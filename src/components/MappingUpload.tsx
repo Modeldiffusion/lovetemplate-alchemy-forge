@@ -33,7 +33,7 @@ export const MappingUpload = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const { createTagMapping, updateTagMapping, createInternalTag, refetch } = useExtractedTags();
+  const { extractedTags, internalTags, tagMappings, createTagMapping, updateTagMapping, createInternalTag, refetch } = useExtractedTags();
 
   const downloadTemplate = () => {
     const templateData = [
@@ -124,7 +124,18 @@ export const MappingUpload = () => {
 
       for (const mapping of validMappings) {
         try {
-          // Always create the internal tag - the system will handle duplicates
+          // Find extracted tags that match this tag name
+          const matchingExtractedTags = extractedTags.filter(tag => 
+            tag.text.toLowerCase().trim() === mapping.tagName.toLowerCase().trim()
+          );
+
+          if (matchingExtractedTags.length === 0) {
+            console.log(`No extracted tags found for: ${mapping.tagName}`);
+            errorCount++;
+            continue;
+          }
+
+          // Create or find the internal tag
           let internalTag;
           try {
             internalTag = await createInternalTag({
@@ -133,39 +144,75 @@ export const MappingUpload = () => {
               description: `Field uploaded from mapping file for tag: ${mapping.tagName}`,
               data_type: 'string'
             });
-            console.log(`Created internal tag: ${mapping.mappingField}`);
           } catch (error) {
-            // Tag might already exist, which is fine
-            console.log(`Internal tag already exists or creation failed: ${mapping.mappingField}`);
+            // Tag might already exist - try to find it
+            const existingTag = internalTags.find(tag => 
+              tag.name.toLowerCase() === mapping.mappingField.toLowerCase().trim()
+            );
+            if (existingTag) {
+              internalTag = existingTag;
+            } else {
+              console.error('Failed to create or find internal tag:', error);
+              errorCount++;
+              continue;
+            }
           }
 
-          // Prepare mapping logic
-          let mappingLogic = `Mapped to field: ${mapping.mappingField}`;
-          if (mapping.customMapping?.trim()) {
-            mappingLogic = `${mappingLogic} | Custom logic: ${mapping.customMapping.trim()}`;
-          }
+          // Create mappings for each matching extracted tag
+          for (const extractedTag of matchingExtractedTags) {
+            try {
+              // Check if mapping already exists
+              const existingMapping = tagMappings.find(m => m.extracted_tag_id === extractedTag.id);
+              
+              let mappingLogic = `Mapped to field: ${mapping.mappingField}`;
+              if (mapping.customMapping?.trim()) {
+                mappingLogic = `${mappingLogic} | Custom logic: ${mapping.customMapping.trim()}`;
+              }
 
-          // Note: In a complete implementation, you would need to:
-          // 1. Find existing extracted tags that match the tag name
-          // 2. Create or update the mapping relationships
-          // 3. Set proper status based on the uploaded data
-          
-          // For now, we're creating the internal tags which will be available for manual mapping
-          console.log(`Processed mapping for tag: ${mapping.tagName} -> ${mapping.mappingField}`);
+              if (existingMapping) {
+                // Update existing mapping
+                await updateTagMapping(existingMapping.id, {
+                  internal_tag_id: internalTag.id,
+                  mapping_logic: mappingLogic,
+                  status: 'mapped',
+                  confidence: 95
+                });
+              } else {
+                // Create new mapping
+                await createTagMapping({
+                  extracted_tag_id: extractedTag.id,
+                  internal_tag_id: internalTag.id,
+                  mapping_logic: mappingLogic,
+                  confidence: 95
+                });
+              }
+              
+              console.log(`Successfully mapped: ${extractedTag.text} -> ${mapping.mappingField}`);
+            } catch (error) {
+              console.error(`Failed to create/update mapping for ${extractedTag.text}:`, error);
+              errorCount++;
+            }
+          }
           
           successCount++;
         } catch (error) {
-          console.error('Error applying mapping:', error);
+          console.error('Error processing mapping:', error);
           errorCount++;
         }
       }
 
-      await refetch();
+      await refetch(); // Refresh data to show updated mappings
       setShowConfirmDialog(false);
       setParsedData([]);
       setUploadedFile(null);
       
-      toast.success(`Applied ${successCount} mappings successfully. ${successCount} internal tags created/updated.${errorCount > 0 ? ` ${errorCount} failed.` : ''}`);
+      if (successCount > 0) {
+        toast.success(`Successfully applied ${successCount} mappings. Check the Tag Library and Mapping sections to see your updates.`);
+      }
+      
+      if (errorCount > 0) {
+        toast.error(`${errorCount} mappings failed. Some tag names might not match existing extracted tags.`);
+      }
       
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -288,6 +335,16 @@ export const MappingUpload = () => {
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
                     Some rows have validation errors. Please fix them before applying mappings.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {parsedData.length > 0 && (
+                <Alert>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <AlertDescription>
+                    The system will match tag names from your CSV with existing extracted tags. 
+                    Make sure the "Tag Name" column exactly matches your extracted tag names.
                   </AlertDescription>
                 </Alert>
               )}
