@@ -8,6 +8,7 @@ import { TemplateGrid } from "@/components/TemplateGrid";
 import { AIConfiguration } from "@/components/AIConfiguration";
 import { TagManager } from "@/components/TagManager";
 import { TagMappingInterface } from "@/components/TagMappingInterface";
+import { TemplateConversion } from "@/components/TemplateConversion";
 import { ConversionDashboard } from "@/components/ConversionDashboard";
 import { DocumentComparison } from "@/components/DocumentComparison";
 import { ReviewWorkflow } from "@/components/ReviewWorkflow";
@@ -67,7 +68,7 @@ const Index = () => {
       case '/tag-analytics':
         return <DashboardHome />; // Placeholder
       case '/conversion':
-        return <ConversionDashboard />;
+        return <TemplateConversion />;
       case '/compare':
         return <DocumentComparison />;
       case '/conversion-templates':
