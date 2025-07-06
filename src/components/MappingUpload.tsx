@@ -129,9 +129,12 @@ export const MappingUpload = () => {
       errors.push('Tag Name is required and cannot be empty');
     }
     
-    // Check if mappingField exists and is not empty
-    if (!row.mappingField || typeof row.mappingField !== 'string' || row.mappingField.trim() === '') {
-      errors.push('Mapping Field is required and cannot be empty');
+    // Check if either mappingField or customMapping is provided
+    const hasMappingField = row.mappingField && typeof row.mappingField === 'string' && row.mappingField.trim() !== '';
+    const hasCustomMapping = row.customMapping && typeof row.customMapping === 'string' && row.customMapping.trim() !== '';
+    
+    if (!hasMappingField && !hasCustomMapping) {
+      errors.push('Either Mapping Field or Custom Mapping is required');
     }
     
     // Make status validation more flexible - accept empty/undefined status
@@ -189,26 +192,47 @@ export const MappingUpload = () => {
             continue;
           }
 
-          // Create or find the internal tag
-          let internalTag;
-          try {
-            internalTag = await createInternalTag({
-              name: mapping.mappingField.trim(),
-              category: 'uploaded_mapping',
-              description: `Field uploaded from mapping file for tag: ${mapping.tagName}`,
-              data_type: 'string'
-            });
-          } catch (error) {
-            // Tag might already exist - try to find it
-            const existingTag = internalTags.find(tag => 
-              tag.name.toLowerCase() === mapping.mappingField.toLowerCase().trim()
-            );
-            if (existingTag) {
-              internalTag = existingTag;
+          // Determine mapping approach based on available fields
+          const hasMappingField = mapping.mappingField && mapping.mappingField.trim() !== '';
+          const hasCustomMapping = mapping.customMapping && mapping.customMapping.trim() !== '';
+          
+          let internalTag = null;
+          let mappingLogic = '';
+          let mappingStatus = 'logic'; // Default for custom mapping only
+
+          if (hasMappingField) {
+            // Create or find the internal tag
+            try {
+              internalTag = await createInternalTag({
+                name: mapping.mappingField.trim(),
+                category: 'uploaded_mapping',
+                description: `Field uploaded from mapping file for tag: ${mapping.tagName}`,
+                data_type: 'string'
+              });
+              mappingStatus = 'mapped';
+              mappingLogic = `Mapped to field: ${mapping.mappingField}`;
+            } catch (error) {
+              // Tag might already exist - try to find it
+              const existingTag = internalTags.find(tag => 
+                tag.name.toLowerCase() === mapping.mappingField.toLowerCase().trim()
+              );
+              if (existingTag) {
+                internalTag = existingTag;
+                mappingStatus = 'mapped';
+                mappingLogic = `Mapped to field: ${mapping.mappingField}`;
+              } else {
+                console.error('Failed to create or find internal tag:', error);
+                errorCount++;
+                continue;
+              }
+            }
+          }
+
+          if (hasCustomMapping) {
+            if (mappingLogic) {
+              mappingLogic += ` | Custom logic: ${mapping.customMapping.trim()}`;
             } else {
-              console.error('Failed to create or find internal tag:', error);
-              errorCount++;
-              continue;
+              mappingLogic = `Custom logic: ${mapping.customMapping.trim()}`;
             }
           }
 
@@ -217,31 +241,26 @@ export const MappingUpload = () => {
             try {
               // Check if mapping already exists
               const existingMapping = tagMappings.find(m => m.extracted_tag_id === extractedTag.id);
-              
-              let mappingLogic = `Mapped to field: ${mapping.mappingField}`;
-              if (mapping.customMapping?.trim()) {
-                mappingLogic = `${mappingLogic} | Custom logic: ${mapping.customMapping.trim()}`;
-              }
 
               if (existingMapping) {
                 // Update existing mapping
                 await updateTagMapping(existingMapping.id, {
-                  internal_tag_id: internalTag.id,
+                  internal_tag_id: internalTag?.id || null,
                   mapping_logic: mappingLogic,
-                  status: 'mapped',
+                  status: mappingStatus,
                   confidence: 95
                 });
               } else {
                 // Create new mapping
                 await createTagMapping({
                   extracted_tag_id: extractedTag.id,
-                  internal_tag_id: internalTag.id,
+                  internal_tag_id: internalTag?.id || null,
                   mapping_logic: mappingLogic,
                   confidence: 95
                 });
               }
               
-              console.log(`Successfully mapped: ${extractedTag.text} -> ${mapping.mappingField}`);
+              console.log(`Successfully mapped: ${extractedTag.text} -> ${mappingLogic}`);
             } catch (error) {
               console.error(`Failed to create/update mapping for ${extractedTag.text}:`, error);
               errorCount++;
