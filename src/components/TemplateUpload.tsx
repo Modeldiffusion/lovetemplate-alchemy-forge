@@ -227,18 +227,28 @@ export const TemplateUpload = () => {
   };
 
   const downloadTemplate = async (file: UploadedFile) => {
+    console.log('Download clicked for file:', file);
     try {
       if (file.templateId) {
+        console.log('Fetching template with ID:', file.templateId);
         // Get template data from Supabase
         const { data: template, error } = await supabase
           .from('templates')
           .select('metadata, name')
           .eq('id', file.templateId)
-          .single();
+          .maybeSingle();
 
         if (error) {
-          throw new Error('Template not found');
+          console.error('Database error:', error);
+          throw new Error('Database error: ' + error.message);
         }
+
+        if (!template) {
+          console.log('No template found in database');
+          throw new Error('Template not found in database');
+        }
+
+        console.log('Template found:', template);
 
         // Extract content from metadata
         const metadata = template.metadata as any;
@@ -296,17 +306,21 @@ export const TemplateUpload = () => {
   };
 
   const deleteUploadedFile = async (fileId: string, templateId?: string) => {
+    console.log('Delete clicked for file:', fileId, 'templateId:', templateId);
     try {
       if (templateId) {
+        console.log('Deleting template from database:', templateId);
         const { error } = await supabase
           .from('templates')
           .delete()
           .eq('id', templateId);
-          
+           
         if (error) {
+          console.error('Database delete error:', error);
           throw new Error(error.message);
         }
         
+        console.log('Template deleted from database');
         toast({
           title: "File deleted",
           description: "Template has been deleted successfully",
@@ -314,6 +328,7 @@ export const TemplateUpload = () => {
       }
       
       // Remove from local state
+      console.log('Removing file from local state');
       setFiles(prev => prev.filter(file => file.id !== fileId));
     } catch (error) {
       console.error('Delete error:', error);
