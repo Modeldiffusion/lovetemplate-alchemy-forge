@@ -31,7 +31,7 @@ interface TagLibraryItem {
 }
 
 export const TagLibrary = () => {
-  const { extractedTags, tagMappings, internalTags, loading, createTagMapping, updateTagMapping, createInternalTag } = useExtractedTags();
+  const { extractedTags, tagMappings, internalTags, loading, createTagMapping, updateTagMapping, createInternalTag, refetch } = useExtractedTags();
   const { getAllFieldNames, loading: fieldsLoading } = useUploadedFields();
   const [tagLibraryData, setTagLibraryData] = useState<TagLibraryItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -137,14 +137,8 @@ export const TagLibrary = () => {
         confidence: 95
       });
 
-      // Update local state
-      setTagLibraryData(prev => 
-        prev.map(item => 
-          item.id === tagId 
-            ? { ...item, mappingField: fieldName, mappingStatus: 'mapped' as const, internalTagId: internalTag.id }
-            : item
-        )
-      );
+      // Refetch data to get the updated mappings and internal tags
+      await refetch();
       
       toast.success(`Tag "${tagLibraryData.find(t => t.id === tagId)?.tagName}" mapped to "${fieldName}"`);
     } catch (error) {
