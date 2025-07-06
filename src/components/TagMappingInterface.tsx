@@ -65,17 +65,21 @@ export const TagMappingInterface = () => {
         ? existingMapping.mapping_logic.replace('DocLevel: ', '') 
         : '';
       
-      // Check for custom mapping
+      // Check for custom mapping (both from unique library and direct custom)
       const hasCustomMapping = existingMapping?.mapping_logic?.includes('Custom:') && !hasDocLevelMapping;
       const customValue = hasCustomMapping 
         ? existingMapping.mapping_logic.replace('Custom: ', '') 
         : '';
       
+      // Get unique library custom mapping if available
+      const uniqueLibraryCustomMapping = uniqueMapping?.validation || '';
+      
       // Determine mapping type: default to 'unique', but switch to 'document' if doc level mapping exists
       const mappingType = hasDocLevelMapping ? 'document' : 'unique';
       
-      // Determine effective mapping field based on precedence
+      // Determine effective mapping field and custom mapping based on precedence
       let effectiveMappingField = '';
+      let effectiveCustomMapping = '';
       let mappingStatus: 'mapped' | 'unmapped' | 'error' = 'unmapped';
       
       if (hasDocLevelMapping && docLevelValue) {
@@ -84,10 +88,12 @@ export const TagMappingInterface = () => {
       } else if (existingMapping?.internal_tag_id) {
         // Direct internal tag mapping
         effectiveMappingField = existingMapping.internal_tag_id;
+        effectiveCustomMapping = customValue;
         mappingStatus = 'mapped';
       } else if (uniqueMapping) {
         // Fallback to unique tag library mapping
         effectiveMappingField = uniqueMapping.id;
+        effectiveCustomMapping = uniqueLibraryCustomMapping;
         mappingStatus = 'mapped';
       }
       
@@ -96,7 +102,7 @@ export const TagMappingInterface = () => {
         tagName: tag.text,
         mappingType: mappingType,
         mappingField: effectiveMappingField,
-        customMapping: customValue,
+        customMapping: effectiveCustomMapping,
         customMappingDocLevel: docLevelValue,
         mappingStatus: mappingStatus,
         isActive: true,
