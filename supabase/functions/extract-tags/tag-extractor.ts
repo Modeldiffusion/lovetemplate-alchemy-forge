@@ -25,7 +25,7 @@ export class TagExtractor {
     
     const patterns = [];
     
-    // Create patterns for delimiter pairs with multi-line support
+    // Create patterns for delimiter pairs
     const pairPatterns = delimiterPairs
       .filter(pair => pair.start && pair.end)
       .map(pair => {
@@ -40,45 +40,43 @@ export class TagExtractor {
           endEscaped = escapeRegex(pair.end);
         }
         
-        // Support multi-line tags by allowing any character including newlines
-        // Use [\s\S] to match any character including newlines
+        // Support mixed case tags, including spaces in tag content for << >> format
         if (pair.start === '<<' || pair.start === '<') {
-          return `(${startEscaped})\\s*([A-Za-z_][\\s\\S]*?)\\s*(${endEscaped})`;
+          return `(${startEscaped})\\s*([A-Za-z_][A-Za-z0-9_\\s]*)\\s*(${endEscaped})`;
         } else {
-          return `(${startEscaped})([A-Za-z_][\\s\\S]*?)(${endEscaped})`;
+          return `(${startEscaped})([A-Za-z_][A-Za-z0-9_]*)(${endEscaped})`;
         }
       });
     
     patterns.push(...pairPatterns);
     
-    // Add common document tag patterns with multi-line support
-    // Unicode guillemets pattern: «TAG» (multi-line)
-    patterns.push('(«)([A-Za-z_][\\s\\S]*?)(»)');
+    // Add common document tag patterns that might not be in delimiter pairs
+    // Unicode guillemets pattern: «TAG»
+    patterns.push('(«)([A-Za-z_][A-Za-z0-9_]*)(»)');
     
-    // @ tag pattern @TAG@ (enclosed, multi-line)
-    patterns.push('(@)([A-Za-z_][\\s\\S]*?)(@)');
+    // @ tag pattern @TAG@ (enclosed)
+    patterns.push('(@)([A-Za-z_][A-Za-z0-9_]*)(@)');
     
-    // @ tag pattern (space/comma terminated) - single line only for this pattern
+    // @ tag pattern (space/comma terminated)
     patterns.push('(@)([A-Za-z_][A-Za-z0-9_]*)(?=[ ,\\n\\t\\r]|$)');
     
-    // Double angle brackets: << TAG >> (multi-line)
-    patterns.push('(<<)\\s*([A-Za-z_][\\s\\S]*?)\\s*(>>)');
+    // Double angle brackets: << TAG >>
+    patterns.push('(<<)\\s*([A-Za-z_][A-Za-z0-9_\\s]*)\\s*(>>)');
     
-    // Square brackets: [TAG] (multi-line)
-    patterns.push('(\\[)([A-Za-z_][\\s\\S]*?)(\\])');
+    // Square brackets: [TAG]
+    patterns.push('(\\[)([A-Za-z_][A-Za-z0-9_]*)(\\])');
     
-    // Curly braces: {TAG} (multi-line)
-    patterns.push('(\\{)([A-Za-z_][\\s\\S]*?)(\\})');
+    // Curly braces: {TAG}
+    patterns.push('(\\{)([A-Za-z_][A-Za-z0-9_]*)(\\})');
     
     if (patterns.length === 0) {
-      // Fallback to default if no valid patterns (with multi-line support)
-      return /(\\[)([A-Za-z_][\\s\\S]*?)(\\])/gis;
+      // Fallback to default if no valid patterns
+      return /(\\[)([A-Za-z_][A-Za-z0-9_]*)(\\])/gi;
     }
     
     // Combine all patterns with OR
     const combinedPattern = patterns.join('|');
-    // Add 's' flag to make . match newlines as well
-    const flags = caseSensitive ? 'gs' : 'gis';
+    const flags = caseSensitive ? 'g' : 'gi';
     
     return new RegExp('(' + combinedPattern + ')', flags);
   }
@@ -141,12 +139,6 @@ export class TagExtractor {
         console.log('Could not parse tag from match:', match);
         continue;
       }
-      
-      // Clean up multi-line tag content - normalize whitespace but preserve intentional formatting
-      tagContent = tagContent.trim();
-      // Replace multiple consecutive whitespace characters (including newlines) with single space
-      // but preserve intentional line breaks by keeping double newlines
-      tagContent = tagContent.replace(/\s+/g, ' ').trim();
       
       // For @ tags, if no explicit end delimiter is captured, use comma or space
       if (startDelim === '@' && !endDelim) {
