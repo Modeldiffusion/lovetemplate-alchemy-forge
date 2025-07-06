@@ -43,12 +43,6 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   {
-    id: "dashboard",
-    label: "Dashboard",
-    icon: Home,
-    path: "/",
-  },
-  {
     id: "templates",
     label: "Processing",
     icon: FileText,
@@ -61,66 +55,6 @@ const menuItems: MenuItem[] = [
     ]
   },
   {
-    id: "ai-processing",
-    label: "AI Processing",
-    icon: Brain,
-    children: [
-      { id: "ai-config", label: "AI Configuration", icon: Settings, path: "/ai-config" },
-      { id: "tag-extraction", label: "Tag Extraction", icon: Target, path: "/tag-extraction" },
-      { id: "batch-processing", label: "Batch Processing", icon: Zap, path: "/batch-processing" },
-    ]
-  },
-  {
-    id: "tag-management",
-    label: "Tag Management",
-    icon: Tags,
-    children: [
-      { id: "tag-mapping", label: "Tag Mapping", icon: ArrowLeftRight, path: "/tag-mapping" },
-      { id: "tag-analytics", label: "Tag Analytics", icon: TrendingUp, path: "/tag-analytics" },
-    ]
-  },
-  {
-    id: "conversion",
-    label: "Conversion Engine",
-    icon: Workflow,
-    children: [
-      { id: "conversion-jobs", label: "Conversion Jobs", icon: Clock, path: "/conversion" },
-      { id: "document-compare", label: "Document Comparison", icon: FileSearch, path: "/compare" },
-      { id: "conversion-templates", label: "Conversion Templates", icon: FileText, path: "/conversion-templates" },
-    ]
-  },
-  {
-    id: "review-workflow",
-    label: "Review & Approval",
-    icon: CheckCircle2,
-    badge: "3",
-    children: [
-      { id: "pending-review", label: "Pending Reviews", icon: Clock, path: "/review", badge: "3" },
-      { id: "review-history", label: "Review History", icon: Archive, path: "/review-history" },
-      { id: "approval-workflow", label: "Workflow Config", icon: UserCheck, path: "/workflow-config" },
-    ]
-  },
-  {
-    id: "change-management",
-    label: "Change Management",
-    icon: GitBranch,
-    children: [
-      { id: "change-requests", label: "Change Requests", icon: FileText, path: "/change-requests" },
-      { id: "impact-analysis", label: "Impact Analysis", icon: TrendingUp, path: "/impact-analysis" },
-      { id: "deployment", label: "Deployment", icon: Zap, path: "/deployment" },
-    ]
-  },
-  {
-    id: "analytics",
-    label: "Analytics & Reports",
-    icon: BarChart3,
-    children: [
-      { id: "performance", label: "Performance Metrics", icon: TrendingUp, path: "/analytics" },
-      { id: "usage-stats", label: "Usage Statistics", icon: BarChart3, path: "/usage-stats" },
-      { id: "ai-performance", label: "AI Performance", icon: Brain, path: "/ai-performance" },
-    ]
-  },
-  {
     id: "administration",
     label: "Administration",
     icon: Shield,
@@ -130,13 +64,6 @@ const menuItems: MenuItem[] = [
       { id: "audit-logs", label: "Audit Logs", icon: Archive, path: "/audit-logs" },
       { id: "system-settings", label: "System Settings", icon: Settings, path: "/settings" },
     ]
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    icon: Bell,
-    path: "/notifications",
-    badge: "5"
   }
 ];
 
@@ -146,7 +73,7 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
-  const [expandedItems, setExpandedItems] = useState<string[]>(["templates", "ai-processing"]);
+  const [expandedItems, setExpandedItems] = useState<string[]>(["templates"]);
   const location = useLocation();
 
   const toggleExpanded = (itemId: string) => {
