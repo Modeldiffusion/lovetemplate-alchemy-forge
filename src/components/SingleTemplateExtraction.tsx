@@ -162,7 +162,7 @@ export const SingleTemplateExtraction = () => {
       
       toast({
         title: "Tag added successfully",
-        description: `Manual tag "${manualTagData.text}" has been added to the library`,
+        description: `Manual tag "${manualTagData.text}" has been added and will appear in the results below`,
       });
     } catch (error) {
       toast({

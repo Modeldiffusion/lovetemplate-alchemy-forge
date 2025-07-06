@@ -235,12 +235,18 @@ export const useExtractedTags = (templateId?: string) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      // Get the highest position for this template to set the next position
+      const maxPosition = extractedTags.length > 0 
+        ? Math.max(...extractedTags.map(tag => tag.position)) 
+        : 0;
+      
       const { data: tag, error } = await supabase
         .from('extracted_tags')
         .insert({
           ...data,
           confidence: data.confidence || 100,
           pattern: data.pattern || 'Manual entry',
+          position: maxPosition + 1,
           extracted_by: user?.id
         })
         .select(`
@@ -251,7 +257,8 @@ export const useExtractedTags = (templateId?: string) => {
 
       if (error) throw error;
       
-      setExtractedTags(prev => [...prev, tag]);
+      // Update the local state to show the new tag immediately
+      setExtractedTags(prev => [...prev, tag].sort((a, b) => a.position - b.position));
       return tag;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create manual tag');
