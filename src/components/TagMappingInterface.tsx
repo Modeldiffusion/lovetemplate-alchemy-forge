@@ -62,105 +62,141 @@ export const TagMappingInterface = () => {
     }
   }, [searchParams, templates]);
 
-  // Initialize template mappings from extracted tags
+  // Initialize template mappings from extracted tags and auto-create mappings from tag library
   useEffect(() => {
-    const mappings: TemplateTagMapping[] = extractedTags.map(tag => {
-      const existingMapping = tagMappings.find(m => m.extracted_tag_id === tag.id);
-      const uniqueMapping = internalTags.find(internal => 
-        internal.name.toLowerCase() === tag.text.toLowerCase()
-      );
-      
-      // Check for document level mapping
-      const hasDocLevelMapping = existingMapping?.mapping_logic?.includes('DocLevel:');
-      const docLevelValue = hasDocLevelMapping 
-        ? existingMapping.mapping_logic.replace('DocLevel: ', '') 
-        : '';
-      
-      // Check for custom mapping (both from existing mappings and unique library)
-      let customValue = '';
-      if (existingMapping?.mapping_logic) {
-        // First check if there's a direct custom mapping
-        if (existingMapping.mapping_logic.includes('Custom:') && !hasDocLevelMapping) {
-          customValue = existingMapping.mapping_logic.replace('Custom: ', '');
+    const initializeMappings = async () => {
+      const mappings: TemplateTagMapping[] = [];
+      const newMappingsToCreate: Array<{
+        extracted_tag_id: string;
+        internal_tag_id: string;
+        confidence: number;
+      }> = [];
+
+      for (const tag of extractedTags) {
+        const existingMapping = tagMappings.find(m => m.extracted_tag_id === tag.id);
+        const uniqueMapping = internalTags.find(internal => 
+          internal.name.toLowerCase() === tag.text.toLowerCase()
+        );
+        
+        // Auto-create mapping if tag matches library but no mapping exists
+        if (uniqueMapping && !existingMapping) {
+          newMappingsToCreate.push({
+            extracted_tag_id: tag.id,
+            internal_tag_id: uniqueMapping.id,
+            confidence: 90 // High confidence for exact name matches
+          });
         }
-        // Also check for custom logic pattern from unique tag mapping
-        else if (existingMapping.mapping_logic.includes('Custom logic:')) {
-          const customPart = existingMapping.mapping_logic.split('Custom logic:')[1];
-          if (customPart) {
-            customValue = customPart.replace(/^\s*\|\s*/, '').trim();
+        
+        // Check for document level mapping
+        const hasDocLevelMapping = existingMapping?.mapping_logic?.includes('DocLevel:');
+        const docLevelValue = hasDocLevelMapping 
+          ? existingMapping.mapping_logic.replace('DocLevel: ', '') 
+          : '';
+        
+        // Check for custom mapping (both from existing mappings and unique library)
+        let customValue = '';
+        if (existingMapping?.mapping_logic) {
+          // First check if there's a direct custom mapping
+          if (existingMapping.mapping_logic.includes('Custom:') && !hasDocLevelMapping) {
+            customValue = existingMapping.mapping_logic.replace('Custom: ', '');
+          }
+          // Also check for custom logic pattern from unique tag mapping
+          else if (existingMapping.mapping_logic.includes('Custom logic:')) {
+            const customPart = existingMapping.mapping_logic.split('Custom logic:')[1];
+            if (customPart) {
+              customValue = customPart.replace(/^\s*\|\s*/, '').trim();
+            }
           }
         }
-      }
-      
-      // If no direct custom mapping found, check if unique mapping exists with custom logic
-      if (!customValue && uniqueMapping) {
-        // Look for existing mapping in tag_mappings that might have custom logic for this internal tag
-        const uniqueTagMapping = tagMappings.find(m => m.internal_tag_id === uniqueMapping.id);
-        if (uniqueTagMapping?.mapping_logic && uniqueTagMapping.mapping_logic.includes('Custom logic:')) {
-          const customPart = uniqueTagMapping.mapping_logic.split('Custom logic:')[1];
-          if (customPart) {
-            customValue = customPart.replace(/^\s*\|\s*/, '').trim();
+        
+        // If no direct custom mapping found, check if unique mapping exists with custom logic
+        if (!customValue && uniqueMapping) {
+          // Look for existing mapping in tag_mappings that might have custom logic for this internal tag
+          const uniqueTagMapping = tagMappings.find(m => m.internal_tag_id === uniqueMapping.id);
+          if (uniqueTagMapping?.mapping_logic && uniqueTagMapping.mapping_logic.includes('Custom logic:')) {
+            const customPart = uniqueTagMapping.mapping_logic.split('Custom logic:')[1];
+            if (customPart) {
+              customValue = customPart.replace(/^\s*\|\s*/, '').trim();
+            }
           }
         }
-      }
-      
-      // Determine mapping type: default to 'unique', but switch to 'document' if doc level mapping exists
-      const mappingType = hasDocLevelMapping ? 'document' : 'unique';
-      
-      // Determine effective mapping field and status based on precedence
-      let effectiveMappingField = '';
-      let mappingStatus: 'mapped' | 'unmapped' | 'error' = 'unmapped';
-      
-      // Check if any mapping exists (field mapping, custom mapping, or doc level mapping)
-      const hasFieldMapping = existingMapping?.internal_tag_id || uniqueMapping;
-      const hasCustomMapping = customValue.trim() !== '';
-      const hasDocLevelMappingValue = docLevelValue.trim() !== '';
-      
-      if (hasDocLevelMappingValue) {
-        // Document level mapping has highest precedence
-        mappingStatus = 'mapped';
-      } else if (hasFieldMapping) {
-        // Field mapping exists
-        if (existingMapping?.internal_tag_id) {
-          effectiveMappingField = existingMapping.internal_tag_id;
-        } else if (uniqueMapping) {
-          effectiveMappingField = uniqueMapping.id;
+        
+        // Determine mapping type: default to 'unique', but switch to 'document' if doc level mapping exists
+        const mappingType = hasDocLevelMapping ? 'document' : 'unique';
+        
+        // Determine effective mapping field and status based on precedence
+        let effectiveMappingField = '';
+        let mappingStatus: 'mapped' | 'unmapped' | 'error' = 'unmapped';
+        
+        // Check if any mapping exists (field mapping, custom mapping, or doc level mapping)
+        const hasFieldMapping = existingMapping?.internal_tag_id || uniqueMapping;
+        const hasCustomMapping = customValue.trim() !== '';
+        const hasDocLevelMappingValue = docLevelValue.trim() !== '';
+        
+        if (hasDocLevelMappingValue) {
+          // Document level mapping has highest precedence
+          mappingStatus = 'mapped';
+        } else if (hasFieldMapping) {
+          // Field mapping exists
+          if (existingMapping?.internal_tag_id) {
+            effectiveMappingField = existingMapping.internal_tag_id;
+          } else if (uniqueMapping) {
+            effectiveMappingField = uniqueMapping.id;
+          }
+          mappingStatus = 'mapped';
+        } else if (hasCustomMapping) {
+          // Only custom mapping exists
+          mappingStatus = 'mapped';
         }
-        mappingStatus = 'mapped';
-      } else if (hasCustomMapping) {
-        // Only custom mapping exists
-        mappingStatus = 'mapped';
+        
+        // If ANY mapping exists, consider it mapped
+        if (hasFieldMapping || hasCustomMapping || hasDocLevelMappingValue) {
+          mappingStatus = 'mapped';
+        }
+        
+        console.log(`Tag ${tag.text}:`, {
+          existingMapping: existingMapping?.mapping_logic,
+          uniqueMapping: uniqueMapping?.name,
+          customValue,
+          effectiveMappingField,
+          mappingStatus
+        });
+        
+        mappings.push({
+          id: tag.id,
+          tagName: tag.text,
+          mappingType: mappingType,
+          mappingField: effectiveMappingField,
+          customMapping: customValue,
+          customMappingDocLevel: docLevelValue,
+          mappingStatus: mappingStatus,
+          isActive: true,
+          templateId: tag.template_id,
+          extractedTagId: tag.id
+        });
       }
       
-      // If ANY mapping exists, consider it mapped
-      if (hasFieldMapping || hasCustomMapping || hasDocLevelMappingValue) {
-        mappingStatus = 'mapped';
+      // Create new mappings automatically for tags that match the library
+      if (newMappingsToCreate.length > 0) {
+        try {
+          console.log('Auto-creating mappings from tag library:', newMappingsToCreate);
+          for (const newMapping of newMappingsToCreate) {
+            await createTagMapping(newMapping);
+          }
+          toast.success(`Auto-mapped ${newMappingsToCreate.length} tags from library`);
+        } catch (error) {
+          console.error('Error auto-creating mappings:', error);
+          toast.error('Failed to auto-create some mappings from library');
+        }
       }
       
-      console.log(`Tag ${tag.text}:`, {
-        existingMapping: existingMapping?.mapping_logic,
-        uniqueMapping: uniqueMapping?.name,
-        customValue,
-        effectiveMappingField,
-        mappingStatus
-      });
-      
-      return {
-        id: tag.id,
-        tagName: tag.text,
-        mappingType: mappingType,
-        mappingField: effectiveMappingField,
-        customMapping: customValue,
-        customMappingDocLevel: docLevelValue,
-        mappingStatus: mappingStatus,
-        isActive: true,
-        templateId: tag.template_id,
-        extractedTagId: tag.id
-      };
-    });
-    
-    setTemplateMappings(mappings);
-  }, [extractedTags, tagMappings, internalTags]);
+      setTemplateMappings(mappings);
+    };
+
+    if (extractedTags.length > 0 && internalTags.length > 0) {
+      initializeMappings();
+    }
+  }, [extractedTags, tagMappings, internalTags, createTagMapping]);
 
   const filteredMappings = templateMappings.filter(mapping => {
     if (selectedDocument === "all") return true;
