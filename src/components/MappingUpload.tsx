@@ -11,6 +11,7 @@ import { Upload, FileText, CheckCircle2, AlertCircle, Download } from "lucide-re
 import Papa from "papaparse";
 import { toast } from "sonner";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
+import { Pagination, ColumnFilters } from "@/components/ui/pagination-table";
 
 interface MappingData {
   tagName: string;
@@ -32,6 +33,13 @@ export const MappingUpload = () => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  
+  // Filter state
+  const [filters, setFilters] = useState<Record<string, string>>({});
   
   const { extractedTags, internalTags, tagMappings, createTagMapping, updateTagMapping, createInternalTag, refetch } = useExtractedTags();
 
@@ -307,6 +315,29 @@ export const MappingUpload = () => {
     }
   };
 
+  // Filter and paginate data
+  const filteredData = parsedData.filter(item => {
+    return Object.entries(filters).every(([key, value]) => {
+      if (!value || value === 'all') return true;
+      
+      switch (key) {
+        case 'tagName':
+          return item.tagName.toLowerCase().includes(value.toLowerCase());
+        case 'mappingField':
+          return item.mappingField?.toLowerCase().includes(value.toLowerCase()) || false;
+        case 'customMapping':
+          return item.customMapping?.toLowerCase().includes(value.toLowerCase()) || false;
+        case 'status':
+          return value === 'Valid' ? item.isValid : !item.isValid;
+        default:
+          return true;
+      }
+    });
+  });
+
+  const startIndex = (currentPage - 1) * pageSize;
+  const filteredPaginatedData = filteredData.slice(startIndex, startIndex + pageSize);
+
   return (
     <div className="space-y-6">
       <Card className="bg-gradient-card shadow-custom-md">
@@ -370,47 +401,74 @@ export const MappingUpload = () => {
                 </div>
               </div>
 
-              <div className="max-h-64 overflow-auto border rounded-lg">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Tag Name</TableHead>
-                      <TableHead>Mapping Field</TableHead>
-                      <TableHead>Custom Mapping</TableHead>
-                      <TableHead>Documents</TableHead>
-                      <TableHead>Errors</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {parsedData.map((row, index) => (
-                      <TableRow key={index} className={row.isValid ? '' : 'bg-red-50'}>
-                        <TableCell>
-                          {row.isValid ? (
-                            <CheckCircle2 className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <AlertCircle className="w-4 h-4 text-red-600" />
-                          )}
-                        </TableCell>
-                        <TableCell className="font-mono text-sm">{row.tagName}</TableCell>
-                        <TableCell>{row.mappingField}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {row.customMapping || 'None'}
-                        </TableCell>
-                        <TableCell className="text-sm">{row.applicableDocuments}</TableCell>
-                        <TableCell className="text-sm">
-                          {row.errors.length > 0 && (
-                            <div className="text-red-600">
-                              {row.errors.map((error, i) => (
-                                <div key={i} className="text-xs">{error}</div>
-                              ))}
-                            </div>
-                          )}
-                        </TableCell>
+              <div className="border rounded-lg">
+                <ColumnFilters
+                  filters={[
+                    { key: 'tagName', label: 'Tag Name', type: 'text' },
+                    { key: 'mappingField', label: 'Mapping Field', type: 'text' },
+                    { key: 'customMapping', label: 'Custom Mapping', type: 'text' },
+                    { key: 'status', label: 'Status', type: 'select', options: ['Valid', 'Invalid'] }
+                  ]}
+                  values={filters}
+                  onChange={(key, value) => setFilters(prev => ({ ...prev, [key]: value }))}
+                  onClear={() => setFilters({})}
+                />
+                
+                <div className="max-h-64 overflow-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Tag Name</TableHead>
+                        <TableHead>Mapping Field</TableHead>
+                        <TableHead>Custom Mapping</TableHead>
+                        <TableHead>Documents</TableHead>
+                        <TableHead>Errors</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPaginatedData.map((row, index) => (
+                        <TableRow key={index} className={row.isValid ? '' : 'bg-red-50'}>
+                          <TableCell>
+                            {row.isValid ? (
+                              <CheckCircle2 className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <AlertCircle className="w-4 h-4 text-red-600" />
+                            )}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">{row.tagName}</TableCell>
+                          <TableCell>{row.mappingField}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {row.customMapping || 'None'}
+                          </TableCell>
+                          <TableCell className="text-sm">{row.applicableDocuments}</TableCell>
+                          <TableCell className="text-sm">
+                            {row.errors.length > 0 && (
+                              <div className="text-red-600">
+                                {row.errors.map((error, i) => (
+                                  <div key={i} className="text-xs">{error}</div>
+                                ))}
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                {filteredData.length > pageSize && (
+                  <Pagination
+                    totalItems={filteredData.length}
+                    currentPage={currentPage}
+                    pageSize={pageSize}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={(size) => {
+                      setPageSize(size);
+                      setCurrentPage(1);
+                    }}
+                  />
+                )}
               </div>
 
               {parsedData.some(row => !row.isValid) && (

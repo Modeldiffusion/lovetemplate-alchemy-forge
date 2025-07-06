@@ -26,6 +26,7 @@ import { useUploadedFields } from "@/hooks/useUploadedFields";
 import { useTemplates } from "@/hooks/useTemplates";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { Pagination, ColumnFilters } from "@/components/ui/pagination-table";
 
 interface TagMappingItem {
   id: string;
@@ -50,6 +51,13 @@ export const UniqueTagMapping = () => {
   const [availableFields, setAvailableFields] = useState<string[]>([]);
   const [editingCustomMapping, setEditingCustomMapping] = useState<string | null>(null);
   const [editingCustomValue, setEditingCustomValue] = useState("");
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  
+  // Filter state
+  const [filters, setFilters] = useState<Record<string, string>>({});
   
   // Manual tag dialog state
   const [isManualTagDialogOpen, setIsManualTagDialogOpen] = useState(false);
@@ -307,6 +315,29 @@ export const UniqueTagMapping = () => {
   };
 
   const filteredData = tagMappingData.filter(item => {
+    // Apply column filters
+    const columnFiltered = Object.entries(filters).every(([key, value]) => {
+      if (!value || value === 'all') return true;
+      
+      switch (key) {
+        case 'tagName':
+          return item.tagName.toLowerCase().includes(value.toLowerCase());
+        case 'mappingField':
+          return item.mappingField?.toLowerCase().includes(value.toLowerCase()) || false;
+        case 'customMapping':
+          return item.customMapping?.toLowerCase().includes(value.toLowerCase()) || false;
+        case 'documents':
+          return item.applicableDocuments.some(doc => 
+            doc.toLowerCase().includes(value.toLowerCase())
+          );
+        case 'status':
+          return item.mappingStatus === value;
+        default:
+          return true;
+      }
+    });
+    
+    // Apply search filter
     const matchesSearch = item.tagName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.mappingField?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.customMapping?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -316,8 +347,11 @@ export const UniqueTagMapping = () => {
     
     const matchesStatus = statusFilter === "all" || item.mappingStatus === statusFilter;
     
-    return matchesSearch && matchesStatus;
+    return columnFiltered && matchesSearch && matchesStatus;
   });
+
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedData = filteredData.slice(startIndex, startIndex + pageSize);
 
   if (loading) {
     return (
@@ -595,6 +629,19 @@ export const UniqueTagMapping = () => {
           </div>
         </CardHeader>
         <CardContent>
+          <ColumnFilters
+            filters={[
+              { key: 'tagName', label: 'Tag Name', type: 'text' },
+              { key: 'mappingField', label: 'Mapping Field', type: 'text' },
+              { key: 'customMapping', label: 'Custom Mapping', type: 'text' },
+              { key: 'documents', label: 'Documents', type: 'text' },
+              { key: 'status', label: 'Status', type: 'select', options: ['unmapped', 'mapped', 'logic', 'validated', 'error'] }
+            ]}
+            values={filters}
+            onChange={(key, value) => setFilters(prev => ({ ...prev, [key]: value }))}
+            onClear={() => setFilters({})}
+          />
+          
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -608,17 +655,17 @@ export const UniqueTagMapping = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredData.length === 0 ? (
+                {paginatedData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      {searchTerm || statusFilter !== "all" 
+                      {searchTerm || statusFilter !== "all" || Object.values(filters).some(v => v && v !== 'all')
                         ? "No tags match your search criteria" 
                         : "No tags found. Extract tags from templates to see them here."
                       }
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredData.map((item) => (
+                  paginatedData.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
                         <div className="font-medium text-foreground">
@@ -760,6 +807,19 @@ export const UniqueTagMapping = () => {
               </TableBody>
             </Table>
           </div>
+          
+          {filteredData.length > pageSize && (
+            <Pagination
+              totalItems={filteredData.length}
+              currentPage={currentPage}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
+          )}
         </CardContent>
       </Card>
     </div>

@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { useTemplates } from "@/hooks/useTemplates";
 import { toast } from "sonner";
+import { Pagination, ColumnFilters } from "@/components/ui/pagination-table";
 
 interface TemplateTagMapping {
   id: string;
@@ -43,6 +44,13 @@ export const TagMappingInterface = () => {
   const [showAddTagDialog, setShowAddTagDialog] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [newTagType, setNewTagType] = useState<string>("unique");
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  
+  // Filter state
+  const [filters, setFilters] = useState<Record<string, string>>({});
   
   const { templates } = useTemplates();
   const { 
@@ -199,9 +207,37 @@ export const TagMappingInterface = () => {
   }, [extractedTags, tagMappings, internalTags, createTagMapping]);
 
   const filteredMappings = templateMappings.filter(mapping => {
-    if (selectedDocument === "all") return true;
-    return mapping.templateId === selectedDocument;
+    // Apply document filter
+    if (selectedDocument !== "all" && mapping.templateId !== selectedDocument) {
+      return false;
+    }
+    
+    // Apply column filters
+    return Object.entries(filters).every(([key, value]) => {
+      if (!value || value === 'all') return true;
+      
+      switch (key) {
+        case 'tagName':
+          return mapping.tagName.toLowerCase().includes(value.toLowerCase());
+        case 'mappingType':
+          return mapping.mappingType === value;
+        case 'mappingField':
+          const fieldName = internalTags.find(t => t.id === mapping.mappingField)?.name || '';
+          return fieldName.toLowerCase().includes(value.toLowerCase());
+        case 'customMapping':
+          return mapping.customMapping?.toLowerCase().includes(value.toLowerCase()) || false;
+        case 'customMappingDocLevel':
+          return mapping.customMappingDocLevel?.toLowerCase().includes(value.toLowerCase()) || false;
+        case 'status':
+          return mapping.mappingStatus === value;
+        default:
+          return true;
+      }
+    });
   });
+
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedMappings = filteredMappings.slice(startIndex, startIndex + pageSize);
 
   const handleMappingTypeChange = (mappingId: string, type: 'unique' | 'document') => {
     setTemplateMappings(prev => 
@@ -438,7 +474,7 @@ export const TagMappingInterface = () => {
               <CheckCircle2 className="w-5 h-5 text-success" />
               <div>
                 <div className="text-2xl font-bold">
-                  {filteredMappings.filter(m => m.mappingStatus === 'mapped').length}
+                  {templateMappings.filter(m => m.mappingStatus === 'mapped').length}
                 </div>
                 <p className="text-xs text-muted-foreground">Mapped</p>
               </div>
@@ -452,7 +488,7 @@ export const TagMappingInterface = () => {
               <AlertCircle className="w-5 h-5 text-warning" />
               <div>
                 <div className="text-2xl font-bold">
-                  {filteredMappings.filter(m => m.mappingStatus === 'unmapped').length}
+                  {templateMappings.filter(m => m.mappingStatus === 'unmapped').length}
                 </div>
                 <p className="text-xs text-muted-foreground">Unmapped</p>
               </div>
@@ -466,7 +502,7 @@ export const TagMappingInterface = () => {
               <Wand2 className="w-5 h-5 text-accent" />
               <div>
                 <div className="text-2xl font-bold">
-                  {filteredMappings.filter(m => m.mappingType === 'unique').length}
+                  {templateMappings.filter(m => m.mappingType === 'unique').length}
                 </div>
                 <p className="text-xs text-muted-foreground">Unique Library</p>
               </div>
@@ -480,7 +516,7 @@ export const TagMappingInterface = () => {
               <FileText className="w-5 h-5 text-secondary" />
               <div>
                 <div className="text-2xl font-bold">
-                  {filteredMappings.filter(m => m.mappingType === 'document').length}
+                  {templateMappings.filter(m => m.mappingType === 'document').length}
                 </div>
                 <p className="text-xs text-muted-foreground">Document Level</p>
               </div>
@@ -498,6 +534,20 @@ export const TagMappingInterface = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <ColumnFilters
+            filters={[
+              { key: 'tagName', label: 'Tag Name', type: 'text' },
+              { key: 'mappingType', label: 'Mapping Type', type: 'select', options: ['unique', 'document'] },
+              { key: 'mappingField', label: 'Mapping Field', type: 'text' },
+              { key: 'customMapping', label: 'Custom Mapping', type: 'text' },
+              { key: 'customMappingDocLevel', label: 'Doc Level Mapping', type: 'text' },
+              { key: 'status', label: 'Status', type: 'select', options: ['mapped', 'unmapped', 'error'] }
+            ]}
+            values={filters}
+            onChange={(key, value) => setFilters(prev => ({ ...prev, [key]: value }))}
+            onClear={() => setFilters({})}
+          />
+          
           <Table>
             <TableHeader>
               <TableRow>
@@ -511,7 +561,7 @@ export const TagMappingInterface = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredMappings.map((mapping) => (
+              {paginatedMappings.map((mapping) => (
                 <TableRow key={mapping.id}>
                   <TableCell>
                     <code className="bg-muted px-2 py-1 rounded text-sm font-mono">
@@ -598,6 +648,19 @@ export const TagMappingInterface = () => {
               ))}
             </TableBody>
           </Table>
+
+          {filteredMappings.length > pageSize && (
+            <Pagination
+              totalItems={filteredMappings.length}
+              currentPage={currentPage}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
+          )}
 
           {filteredMappings.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
