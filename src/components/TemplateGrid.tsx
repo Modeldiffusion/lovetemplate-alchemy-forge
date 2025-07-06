@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { DocumentViewer } from "./DocumentViewer";
+import { Pagination, ColumnFilters } from "@/components/ui/pagination-table";
 
 export const TemplateGrid = () => {
   const { templates, loading, error, refetch, deleteTemplate } = useTemplates();
@@ -19,16 +20,61 @@ export const TemplateGrid = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [viewingTemplate, setViewingTemplate] = useState<Template | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
   const { toast } = useToast();
 
   const filteredTemplates = templates.filter(template => {
     const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || template.status === statusFilter;
     const matchesType = typeFilter === "all" || template.file_type === typeFilter;
-    return matchesSearch && matchesStatus && matchesType;
+    
+    // Apply column filters
+    const matchesColumnFilters = Object.entries(columnFilters).every(([key, value]) => {
+      if (!value || value === 'all') return true;
+      
+      switch (key) {
+        case 'name':
+          return template.name.toLowerCase().includes(value.toLowerCase());
+        case 'status':
+          return template.status === value;
+        case 'file_type':
+          return template.file_type === value;
+        case 'size':
+          return formatFileSize(template.file_size).toLowerCase().includes(value.toLowerCase());
+        default:
+          return true;
+      }
+    });
+    
+    return matchesSearch && matchesStatus && matchesType && matchesColumnFilters;
   });
 
+  // Pagination
+  const totalPages = Math.ceil(filteredTemplates.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedTemplates = filteredTemplates.slice(startIndex, startIndex + pageSize);
+
   const uniqueFileTypes = Array.from(new Set(templates.map(t => t.file_type).filter(Boolean)));
+  const uniqueStatuses = Array.from(new Set(templates.map(t => t.status)));
+
+  const handleColumnFilterChange = (key: string, value: string) => {
+    setColumnFilters(prev => ({ ...prev, [key]: value }));
+    setCurrentPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setColumnFilters({});
+    setCurrentPage(1);
+  };
+
+  const columnFilterOptions = [
+    { key: 'name', label: 'Name', type: 'text' as const },
+    { key: 'status', label: 'Status', type: 'select' as const, options: uniqueStatuses },
+    { key: 'file_type', label: 'Type', type: 'select' as const, options: uniqueFileTypes },
+    { key: 'size', label: 'Size', type: 'text' as const }
+  ];
 
   const getStatusColor = (status: Template['status']) => {
     switch (status) {
@@ -238,7 +284,7 @@ export const TemplateGrid = () => {
           <CardTitle>Templates ({filteredTemplates.length})</CardTitle>
           <CardDescription>Your uploaded template files</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {filteredTemplates.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
@@ -249,6 +295,12 @@ export const TemplateGrid = () => {
             </div>
           ) : (
             <div className="rounded-md border overflow-hidden">
+              <ColumnFilters
+                filters={columnFilterOptions}
+                values={columnFilters}
+                onChange={handleColumnFilterChange}
+                onClear={handleClearFilters}
+              />
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -262,7 +314,7 @@ export const TemplateGrid = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTemplates.map((template) => (
+                  {paginatedTemplates.map((template) => (
                     <TableRow key={template.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center space-x-2">
@@ -328,6 +380,16 @@ export const TemplateGrid = () => {
                   ))}
                 </TableBody>
               </Table>
+              <Pagination
+                totalItems={filteredTemplates.length}
+                currentPage={currentPage}
+                pageSize={pageSize}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setCurrentPage(1);
+                }}
+              />
             </div>
           )}
         </CardContent>

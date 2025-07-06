@@ -53,8 +53,6 @@ const menuItems: MenuItem[] = [
       { id: "tag-library", label: "Tag Library", icon: Database, path: "/tag-library" },
       { id: "mapping", label: "Mapping", icon: MapPin, path: "/mapping" },
       { id: "conversion", label: "Template Conversion", icon: ArrowLeftRight, path: "/conversion" },
-      { id: "library", label: "Template Library", icon: Archive, path: "/library" },
-      { id: "versions", label: "Version Control", icon: GitBranch, path: "/versions" },
     ]
   },
   {

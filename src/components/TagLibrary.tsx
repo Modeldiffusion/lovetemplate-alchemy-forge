@@ -24,6 +24,7 @@ import { useUploadedFields } from "@/hooks/useUploadedFields";
 import { useTemplates } from "@/hooks/useTemplates";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import { Pagination, ColumnFilters } from "@/components/ui/pagination-table";
 
 interface TagLibraryItem {
   id: string;
@@ -45,6 +46,9 @@ export const TagLibrary = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [availableFields, setAvailableFields] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
   
   // Manual tag dialog state
   const [isManualTagDialogOpen, setIsManualTagDialogOpen] = useState(false);
@@ -271,8 +275,49 @@ export const TagLibrary = () => {
     
     const matchesStatus = statusFilter === "all" || item.mappingStatus === statusFilter;
     
-    return matchesSearch && matchesStatus;
+    // Apply column filters
+    const matchesColumnFilters = Object.entries(columnFilters).every(([key, value]) => {
+      if (!value || value === 'all') return true;
+      
+      switch (key) {
+        case 'tagName':
+          return item.tagName.toLowerCase().includes(value.toLowerCase());
+        case 'mappingField':
+          return item.mappingField?.toLowerCase().includes(value.toLowerCase()) || false;
+        case 'customMapping':
+          return item.customMapping?.toLowerCase().includes(value.toLowerCase()) || false;
+        case 'status':
+          return item.mappingStatus === value;
+        default:
+          return true;
+      }
+    });
+    
+    return matchesSearch && matchesStatus && matchesColumnFilters;
   });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredData.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedData = filteredData.slice(startIndex, startIndex + pageSize);
+
+  const handleColumnFilterChange = (key: string, value: string) => {
+    setColumnFilters(prev => ({ ...prev, [key]: value }));
+    setCurrentPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setColumnFilters({});
+    setCurrentPage(1);
+  };
+
+  const uniqueStatuses = Array.from(new Set(tagLibraryData.map(t => t.mappingStatus)));
+  const columnFilterOptions = [
+    { key: 'tagName', label: 'Tag Name', type: 'text' as const },
+    { key: 'mappingField', label: 'Mapping Field', type: 'text' as const },
+    { key: 'customMapping', label: 'Custom Mapping', type: 'text' as const },
+    { key: 'status', label: 'Status', type: 'select' as const, options: uniqueStatuses }
+  ];
 
   if (loading) {
     return (
@@ -522,8 +567,14 @@ export const TagLibrary = () => {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
+            <ColumnFilters
+              filters={columnFilterOptions}
+              values={columnFilters}
+              onChange={handleColumnFilterChange}
+              onClear={handleClearFilters}
+            />
             <Table>
               <TableHeader>
                 <TableRow>
@@ -537,7 +588,7 @@ export const TagLibrary = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredData.length === 0 ? (
+                {paginatedData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       {searchTerm || statusFilter !== "all" 
@@ -547,7 +598,7 @@ export const TagLibrary = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredData.map((item) => (
+                  paginatedData.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
                         <div className="font-medium text-foreground">
@@ -652,6 +703,16 @@ export const TagLibrary = () => {
                 )}
               </TableBody>
             </Table>
+            <Pagination
+              totalItems={filteredData.length}
+              currentPage={currentPage}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+            />
           </div>
         </CardContent>
       </Card>
