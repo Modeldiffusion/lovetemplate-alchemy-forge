@@ -17,7 +17,9 @@ import {
   Download,
   Plus,
   Save,
-  X
+  X,
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { useUploadedFields } from "@/hooks/useUploadedFields";
@@ -349,16 +351,14 @@ export const UniqueTagMapping = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="bg-gradient-card shadow-custom-sm">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Tag className="w-5 h-5 text-blue-600" />
-              </div>
+            <div className="flex items-center space-x-2">
+              <Tag className="w-5 h-5 text-primary" />
               <div>
-                <p className="text-sm text-muted-foreground">Total Tags</p>
-                <p className="text-xl font-bold">{tagMappingData.length}</p>
+                <div className="text-2xl font-bold">{tagMappingData.length}</div>
+                <p className="text-xs text-muted-foreground">Total Tags</p>
               </div>
             </div>
           </CardContent>
@@ -366,15 +366,13 @@ export const UniqueTagMapping = () => {
 
         <Card className="bg-gradient-card shadow-custom-sm">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Tag className="w-5 h-5 text-green-600" />
-              </div>
+            <div className="flex items-center space-x-2">
+              <CheckCircle2 className="w-5 h-5 text-success" />
               <div>
-                <p className="text-sm text-muted-foreground">Field Mapped</p>
-                <p className="text-xl font-bold">
+                <div className="text-2xl font-bold">
                   {tagMappingData.filter(t => t.mappingStatus === 'mapped').length}
-                </p>
+                </div>
+                <p className="text-xs text-muted-foreground">Field Mapped</p>
               </div>
             </div>
           </CardContent>
@@ -382,15 +380,27 @@ export const UniqueTagMapping = () => {
 
         <Card className="bg-gradient-card shadow-custom-sm">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Tag className="w-5 h-5 text-yellow-600" />
-              </div>
+            <div className="flex items-center space-x-2">
+              <Edit className="w-5 h-5 text-accent" />
               <div>
-                <p className="text-sm text-muted-foreground">Custom Logic</p>
-                <p className="text-xl font-bold">
+                <div className="text-2xl font-bold">
+                  {tagMappingData.filter(t => t.customMapping).length}
+                </div>
+                <p className="text-xs text-muted-foreground">Custom Mapping</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card shadow-custom-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <FileText className="w-5 h-5 text-warning" />
+              <div>
+                <div className="text-2xl font-bold">
                   {tagMappingData.filter(t => t.mappingStatus === 'logic').length}
-                </p>
+                </div>
+                <p className="text-xs text-muted-foreground">Logic Applied</p>
               </div>
             </div>
           </CardContent>
@@ -398,15 +408,13 @@ export const UniqueTagMapping = () => {
 
         <Card className="bg-gradient-card shadow-custom-sm">
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                <Tag className="w-5 h-5 text-gray-600" />
-              </div>
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="w-5 h-5 text-muted-foreground" />
               <div>
-                <p className="text-sm text-muted-foreground">Unmapped</p>
-                <p className="text-xl font-bold">
+                <div className="text-2xl font-bold">
                   {tagMappingData.filter(t => t.mappingStatus === 'unmapped').length}
-                </p>
+                </div>
+                <p className="text-xs text-muted-foreground">Unmapped</p>
               </div>
             </div>
           </CardContent>

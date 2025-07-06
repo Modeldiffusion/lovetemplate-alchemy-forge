@@ -311,6 +311,77 @@ export const TagMappingInterface = () => {
         </CardContent>
       </Card>
 
+      {/* Dashboard Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card className="bg-gradient-card shadow-custom-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <FileText className="w-5 h-5 text-primary" />
+              <div>
+                <div className="text-2xl font-bold">{filteredMappings.length}</div>
+                <p className="text-xs text-muted-foreground">Total Tags</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-card shadow-custom-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <CheckCircle2 className="w-5 h-5 text-success" />
+              <div>
+                <div className="text-2xl font-bold">
+                  {filteredMappings.filter(m => m.mappingStatus === 'mapped').length}
+                </div>
+                <p className="text-xs text-muted-foreground">Mapped</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-card shadow-custom-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="w-5 h-5 text-warning" />
+              <div>
+                <div className="text-2xl font-bold">
+                  {filteredMappings.filter(m => m.mappingStatus === 'unmapped').length}
+                </div>
+                <p className="text-xs text-muted-foreground">Unmapped</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-card shadow-custom-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Wand2 className="w-5 h-5 text-accent" />
+              <div>
+                <div className="text-2xl font-bold">
+                  {filteredMappings.filter(m => m.mappingType === 'unique').length}
+                </div>
+                <p className="text-xs text-muted-foreground">Unique Library</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-gradient-card shadow-custom-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <FileText className="w-5 h-5 text-secondary" />
+              <div>
+                <div className="text-2xl font-bold">
+                  {filteredMappings.filter(m => m.mappingType === 'document').length}
+                </div>
+                <p className="text-xs text-muted-foreground">Document Level</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Mapping Table */}
       <Card className="bg-gradient-card shadow-custom-md">
         <CardHeader>
