@@ -225,6 +225,40 @@ export const useExtractedTags = (templateId?: string) => {
     }
   };
 
+  const createManualTag = async (data: {
+    template_id: string;
+    text: string;
+    pattern?: string;
+    context?: string;
+    confidence?: number;
+  }) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { data: tag, error } = await supabase
+        .from('extracted_tags')
+        .insert({
+          ...data,
+          confidence: data.confidence || 100,
+          pattern: data.pattern || 'Manual entry',
+          extracted_by: user?.id
+        })
+        .select(`
+          *,
+          template:templates(id, name)
+        `)
+        .single();
+
+      if (error) throw error;
+      
+      setExtractedTags(prev => [...prev, tag]);
+      return tag;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create manual tag');
+      throw err;
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -249,6 +283,7 @@ export const useExtractedTags = (templateId?: string) => {
     createTagMapping,
     updateTagMapping,
     createInternalTag,
+    createManualTag,
     refetch: () => {
       fetchExtractedTags();
       fetchInternalTags();

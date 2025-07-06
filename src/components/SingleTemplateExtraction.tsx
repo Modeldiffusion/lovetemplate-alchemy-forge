@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, FileText, Zap, CheckCircle2, AlertCircle, RefreshCw, Target } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ArrowLeft, FileText, Zap, CheckCircle2, AlertCircle, RefreshCw, Target, Plus } from "lucide-react";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { useToast } from "@/hooks/use-toast";
@@ -18,12 +19,20 @@ export const SingleTemplateExtraction = () => {
   const { templateId } = useParams<{ templateId: string }>();
   const navigate = useNavigate();
   const { templates } = useTemplates();
-  const { extractTags, extractedTags, loading } = useExtractedTags(templateId);
+  const { extractTags, extractedTags, loading, createManualTag } = useExtractedTags(templateId);
   const { toast } = useToast();
   
   const [extractionStatus, setExtractionStatus] = useState<'idle' | 'extracting' | 'completed' | 'error'>('idle');
   const [progress, setProgress] = useState(0);
   const [extractionResults, setExtractionResults] = useState<any>(null);
+  
+  // Dialog state for manual tag addition
+  const [isManualTagDialogOpen, setIsManualTagDialogOpen] = useState(false);
+  const [manualTagData, setManualTagData] = useState({
+    text: '',
+    context: '',
+    confidence: 100
+  });
 
   // Delimiter configuration state
   const [delimiterPairs, setDelimiterPairs] = useState<Array<{start: string, end: string}>>([
@@ -134,6 +143,33 @@ export const SingleTemplateExtraction = () => {
         return 'Failed';
       default:
         return 'Ready';
+    }
+  };
+
+  const handleManualTagAdd = async () => {
+    if (!templateId || !manualTagData.text.trim()) return;
+    
+    try {
+      await createManualTag({
+        template_id: templateId,
+        text: manualTagData.text.trim(),
+        context: manualTagData.context.trim(),
+        confidence: manualTagData.confidence
+      });
+      
+      setManualTagData({ text: '', context: '', confidence: 100 });
+      setIsManualTagDialogOpen(false);
+      
+      toast({
+        title: "Tag added successfully",
+        description: `Manual tag "${manualTagData.text}" has been added to the library`,
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to add tag",
+        description: error instanceof Error ? error.message : "Failed to add manual tag",
+        variant: "destructive"
+      });
     }
   };
 
@@ -439,13 +475,75 @@ export const SingleTemplateExtraction = () => {
               </div>
             )}
 
-            <div className="flex justify-center mt-6">
+            <div className="flex justify-center mt-6 space-x-4">
               <Button
                 onClick={() => navigate('/tag-library')}
                 variant="outline"
               >
                 View in Tag Library
               </Button>
+              
+              <Dialog open={isManualTagDialogOpen} onOpenChange={setIsManualTagDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    Add Manual Tag
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Add Manual Tag</DialogTitle>
+                    <DialogDescription>
+                      Add a tag that the system might have missed during extraction
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="tag-text">Tag Text</Label>
+                      <Input
+                        id="tag-text"
+                        value={manualTagData.text}
+                        onChange={(e) => setManualTagData(prev => ({ ...prev, text: e.target.value }))}
+                        placeholder="Enter tag text (e.g., [COMPANY_NAME])"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="tag-context">Context (Optional)</Label>
+                      <Textarea
+                        id="tag-context"
+                        value={manualTagData.context}
+                        onChange={(e) => setManualTagData(prev => ({ ...prev, context: e.target.value }))}
+                        placeholder="Describe where this tag should be used..."
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="tag-confidence">Confidence (%)</Label>
+                      <Input
+                        id="tag-confidence"
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={manualTagData.confidence}
+                        onChange={(e) => setManualTagData(prev => ({ ...prev, confidence: parseInt(e.target.value) || 100 }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsManualTagDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleManualTagAdd}
+                      disabled={!manualTagData.text.trim()}
+                    >
+                      Add Tag
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </CardContent>
         </Card>

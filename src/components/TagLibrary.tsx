@@ -5,6 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Search, 
   Edit,
@@ -12,10 +15,12 @@ import {
   FileText,
   Filter,
   ChevronDown,
-  Download
+  Download,
+  Plus
 } from "lucide-react";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { useUploadedFields } from "@/hooks/useUploadedFields";
+import { useTemplates } from "@/hooks/useTemplates";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
@@ -31,12 +36,22 @@ interface TagLibraryItem {
 }
 
 export const TagLibrary = () => {
-  const { extractedTags, tagMappings, internalTags, loading, createTagMapping, updateTagMapping, createInternalTag, refetch } = useExtractedTags();
+  const { extractedTags, tagMappings, internalTags, loading, createTagMapping, updateTagMapping, createInternalTag, createManualTag, refetch } = useExtractedTags();
   const { getAllFieldNames, loading: fieldsLoading } = useUploadedFields();
+  const { templates } = useTemplates();
   const [tagLibraryData, setTagLibraryData] = useState<TagLibraryItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [availableFields, setAvailableFields] = useState<string[]>([]);
+  
+  // Manual tag dialog state
+  const [isManualTagDialogOpen, setIsManualTagDialogOpen] = useState(false);
+  const [manualTagData, setManualTagData] = useState({
+    text: '',
+    context: '',
+    confidence: 100,
+    templateId: ''
+  });
 
   // Load available fields
   useEffect(() => {
@@ -163,6 +178,26 @@ export const TagLibrary = () => {
   const handleEdit = (tagId: string) => {
     // Navigate to edit page or open edit modal
     toast.info("Edit functionality will be implemented");
+  };
+
+  const handleManualTagAdd = async () => {
+    if (!manualTagData.text.trim() || !manualTagData.templateId) return;
+    
+    try {
+      await createManualTag({
+        template_id: manualTagData.templateId,
+        text: manualTagData.text.trim(),
+        context: manualTagData.context.trim(),
+        confidence: manualTagData.confidence
+      });
+      
+      setManualTagData({ text: '', context: '', confidence: 100, templateId: '' });
+      setIsManualTagDialogOpen(false);
+      
+      toast.success(`Manual tag "${manualTagData.text}" has been added to the library`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to add manual tag");
+    }
   };
 
   const handleExport = () => {
@@ -358,16 +393,98 @@ export const TagLibrary = () => {
                 Manage extracted tags and their mappings across all documents
               </CardDescription>
             </div>
-            <Button
-              onClick={handleExport}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-              disabled={filteredData.length === 0}
-            >
-              <Download className="w-4 h-4" />
-              Export CSV
-            </Button>
+            <div className="flex items-center gap-2">
+              <Dialog open={isManualTagDialogOpen} onOpenChange={setIsManualTagDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex items-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    Add Manual Tag
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Add Manual Tag</DialogTitle>
+                    <DialogDescription>
+                      Add a tag that the system might have missed during extraction
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="manual-tag-text">Tag Text</Label>
+                      <Input
+                        id="manual-tag-text"
+                        value={manualTagData.text}
+                        onChange={(e) => setManualTagData(prev => ({ ...prev, text: e.target.value }))}
+                        placeholder="Enter tag text (e.g., [CLIENT_NAME])"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="manual-tag-document">Select Document</Label>
+                      <Select
+                        value={manualTagData.templateId}
+                        onValueChange={(value) => setManualTagData(prev => ({ ...prev, templateId: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select document..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {templates.map((template) => (
+                            <SelectItem key={template.id} value={template.id}>
+                              {template.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="manual-tag-context">Context (Optional)</Label>
+                      <Textarea
+                        id="manual-tag-context"
+                        value={manualTagData.context}
+                        onChange={(e) => setManualTagData(prev => ({ ...prev, context: e.target.value }))}
+                        placeholder="Describe where this tag should be used..."
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="manual-tag-confidence">Confidence (%)</Label>
+                      <Input
+                        id="manual-tag-confidence"
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={manualTagData.confidence}
+                        onChange={(e) => setManualTagData(prev => ({ ...prev, confidence: parseInt(e.target.value) || 100 }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsManualTagDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleManualTagAdd}
+                      disabled={!manualTagData.text.trim() || !manualTagData.templateId}
+                    >
+                      Add Tag
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              
+              <Button
+                onClick={handleExport}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+                disabled={filteredData.length === 0}
+              >
+                <Download className="w-4 h-4" />
+                Export CSV
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -401,31 +518,38 @@ export const TagLibrary = () => {
                           {item.tagName}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        {item.mappingField ? (
-                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                            {item.mappingField}
-                          </Badge>
-                        ) : availableFields.length > 0 ? (
-                          <Select
-                            value=""
-                            onValueChange={(value) => handleFieldMapping(item.id, item.extractedTagId, value)}
-                          >
-                            <SelectTrigger className="w-48">
-                              <SelectValue placeholder="Select field..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {availableFields.map((field) => (
-                                <SelectItem key={field} value={field}>
-                                  {field}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <span className="text-muted-foreground">Not mapped</span>
-                        )}
-                      </TableCell>
+                       <TableCell>
+                         <div className="space-y-2">
+                           {item.mappingField && (
+                             <div className="flex items-center gap-2">
+                               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                 {item.mappingField}
+                               </Badge>
+                               <span className="text-xs text-muted-foreground">Mapped</span>
+                             </div>
+                           )}
+                           {availableFields.length > 0 && (
+                             <Select
+                               value=""
+                               onValueChange={(value) => handleFieldMapping(item.id, item.extractedTagId, value)}
+                             >
+                               <SelectTrigger className="w-48">
+                                 <SelectValue placeholder={item.mappingField ? "Map to another field..." : "Select field..."} />
+                               </SelectTrigger>
+                               <SelectContent>
+                                 {availableFields.map((field) => (
+                                   <SelectItem key={field} value={field}>
+                                     {field}
+                                   </SelectItem>
+                                 ))}
+                               </SelectContent>
+                             </Select>
+                           )}
+                           {!item.mappingField && availableFields.length === 0 && (
+                             <span className="text-muted-foreground">Not mapped</span>
+                           )}
+                         </div>
+                       </TableCell>
                       <TableCell>
                         <div className="max-w-xs">
                           {item.applicableDocuments.length > 0 ? (
