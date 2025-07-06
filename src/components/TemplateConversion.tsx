@@ -134,7 +134,7 @@ export const TemplateConversion = () => {
 
         // Check for document level mapping first (highest priority)
         if (mapping?.mapping_logic?.includes('DocLevel:')) {
-          const docLevelValue = mapping.mapping_logic.split('DocLevel:')[1]?.trim();
+          const docLevelValue = mapping.mapping_logic.replace(/^DocLevel:\s*/, '').trim();
           if (docLevelValue) {
             return {
               original: tag.text,
@@ -164,7 +164,7 @@ export const TemplateConversion = () => {
           
           // Handle different custom mapping formats
           if (mapping.mapping_logic.includes('Custom:') && !mapping.mapping_logic.includes('DocLevel:')) {
-            customValue = mapping.mapping_logic.replace('Custom:', '').trim();
+            customValue = mapping.mapping_logic.replace(/^Custom:\s*/, '').trim();
           } else if (mapping.mapping_logic.includes('Custom logic:')) {
             const parts = mapping.mapping_logic.split('Custom logic:');
             if (parts[1]) {
@@ -172,7 +172,7 @@ export const TemplateConversion = () => {
             }
           } else if (mapping.mapping_logic.includes('Field mapped to:')) {
             // Extract field name from mapping logic
-            const fieldPart = mapping.mapping_logic.replace('Field mapped to:', '').trim();
+            const fieldPart = mapping.mapping_logic.replace(/^Field mapped to:\s*/, '').trim();
             if (fieldPart) {
               customValue = fieldPart;
             }
@@ -284,7 +284,7 @@ and highlight replaced content in blue color.`;
 
         const hasDocLevelMapping = mapping?.mapping_logic?.includes('DocLevel:');
         if (hasDocLevelMapping) {
-          const docLevelValue = mapping.mapping_logic.replace('DocLevel: ', '').trim();
+          const docLevelValue = mapping.mapping_logic.replace(/^DocLevel:\s*/, '').trim();
           if (docLevelValue) {
             mappingType = 'Document Level';
             replacementValue = docLevelValue;
@@ -300,7 +300,7 @@ and highlight replaced content in blue color.`;
         } else if (mapping?.mapping_logic) {
           let customValue = '';
           if (mapping.mapping_logic.includes('Custom:')) {
-            customValue = mapping.mapping_logic.replace('Custom: ', '').trim();
+            customValue = mapping.mapping_logic.replace(/^Custom:\s*/, '').trim();
           } else if (mapping.mapping_logic.includes('Custom logic:')) {
             const customPart = mapping.mapping_logic.split('Custom logic:')[1];
             if (customPart) {

@@ -90,7 +90,7 @@ export const TagMappingInterface = () => {
         // Check for document level mapping
         const hasDocLevelMapping = existingMapping?.mapping_logic?.includes('DocLevel:');
         const docLevelValue = hasDocLevelMapping 
-          ? existingMapping.mapping_logic.replace('DocLevel: ', '') 
+          ? existingMapping.mapping_logic.replace(/^DocLevel:\s*/, '').trim()
           : '';
         
         // Check for custom mapping (both from existing mappings and unique library)
@@ -98,7 +98,7 @@ export const TagMappingInterface = () => {
         if (existingMapping?.mapping_logic) {
           // First check if there's a direct custom mapping
           if (existingMapping.mapping_logic.includes('Custom:') && !hasDocLevelMapping) {
-            customValue = existingMapping.mapping_logic.replace('Custom: ', '');
+            customValue = existingMapping.mapping_logic.replace(/^Custom:\s*/, '').trim();
           }
           // Also check for custom logic pattern from unique tag mapping
           else if (existingMapping.mapping_logic.includes('Custom logic:')) {

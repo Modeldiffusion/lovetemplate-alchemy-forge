@@ -101,7 +101,20 @@ export const useExtractedTags = (templateId?: string) => {
         `);
 
       if (templateId) {
-        query = query.eq('extracted_tags.template_id', templateId);
+        // First get all extracted tags for this template, then filter mappings
+        const { data: templateTags } = await supabase
+          .from('extracted_tags')
+          .select('id')
+          .eq('template_id', templateId);
+        
+        if (templateTags && templateTags.length > 0) {
+          const tagIds = templateTags.map(tag => tag.id);
+          query = query.in('extracted_tag_id', tagIds);
+        } else {
+          // No tags for this template, return empty result
+          setTagMappings([]);
+          return;
+        }
       }
 
       const { data, error } = await query;
