@@ -14,6 +14,7 @@ import { ReviewWorkflow } from "@/components/ReviewWorkflow";
 import { TemplateExtractionGrid } from "@/components/TemplateExtractionGrid";
 import { TemplateExtractionForm } from "@/components/TemplateExtractionForm";
 import { TagLibrary } from "@/components/TagLibrary";
+import { SingleTemplateExtraction } from "@/components/SingleTemplateExtraction";
 
 const Index = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -26,8 +27,11 @@ const Index = () => {
     
     // Handle dynamic routes first
     if (path.startsWith('/extraction/') && path !== '/extraction') {
-      console.log('Rendering TemplateExtractionForm'); // Debug logging
-      return <TemplateExtractionForm />;
+      const templateId = path.split('/extraction/')[1];
+      if (templateId && templateId !== 'bulk') {
+        console.log('Rendering SingleTemplateExtraction for:', templateId);
+        return <SingleTemplateExtraction />;
+      }
     }
     
     switch (path) {

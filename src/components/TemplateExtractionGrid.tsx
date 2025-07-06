@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, FileText, RefreshCw, Download, Eye, Trash2 } from "lucide-react";
+import { Search, FileText, RefreshCw, Download, Eye, Trash2, Zap } from "lucide-react";
 import { useTemplates } from "@/hooks/useTemplates";
 import type { Template } from "@/hooks/useTemplates";
 import { format } from "date-fns";
@@ -78,6 +78,18 @@ export const TemplateExtractionGrid = () => {
     }
   };
 
+  const handleExtractAll = async () => {
+    const completedTemplates = filteredTemplates.filter(t => t.status === 'completed');
+    if (completedTemplates.length === 0) {
+      return;
+    }
+    
+    // For now, just navigate to the first template as an example
+    // In a real implementation, you'd want to process all templates
+    const firstTemplate = completedTemplates[0];
+    navigate(`/extraction/${firstTemplate.id}`);
+  };
+
   if (loading) {
     return (
       <Card className="bg-gradient-card shadow-custom-md">
@@ -114,6 +126,14 @@ export const TemplateExtractionGrid = () => {
           <p className="text-muted-foreground">Extract tags from uploaded templates or paste content directly</p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            onClick={handleExtractAll}
+            className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white"
+            disabled={filteredTemplates.filter(t => t.status === 'completed').length === 0}
+          >
+            <Zap className="w-4 h-4 mr-2" />
+            Quick Extract
+          </Button>
           <Button 
             onClick={handleBulkExtract} 
             disabled={selectedTemplates.length === 0}
@@ -210,14 +230,15 @@ export const TemplateExtractionGrid = () => {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end space-x-1">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 w-8 p-0 text-primary hover:text-primary"
-                                onClick={() => handleExtractSingle(template.id)}
-                              >
-                                Extract
-                              </Button>
+                           <Button 
+                                 variant="ghost" 
+                                 size="sm" 
+                                 className="h-8 w-8 p-0 text-primary hover:text-primary hover:bg-primary/10"
+                                 onClick={() => handleExtractSingle(template.id)}
+                                 title="Extract tags from this template"
+                               >
+                                 <Zap className="w-4 h-4" />
+                               </Button>
                               <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                 <Eye className="w-4 h-4" />
                               </Button>
