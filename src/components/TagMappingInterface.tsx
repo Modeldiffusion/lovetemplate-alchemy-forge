@@ -65,21 +65,39 @@ export const TagMappingInterface = () => {
         ? existingMapping.mapping_logic.replace('DocLevel: ', '') 
         : '';
       
-      // Check for custom mapping (both from unique library and direct custom)
-      const hasCustomMapping = existingMapping?.mapping_logic?.includes('Custom:') && !hasDocLevelMapping;
-      const customValue = hasCustomMapping 
-        ? existingMapping.mapping_logic.replace('Custom: ', '') 
-        : '';
+      // Check for custom mapping (both from existing mappings and unique library)
+      let customValue = '';
+      if (existingMapping?.mapping_logic) {
+        // First check if there's a direct custom mapping
+        if (existingMapping.mapping_logic.includes('Custom:') && !hasDocLevelMapping) {
+          customValue = existingMapping.mapping_logic.replace('Custom: ', '');
+        }
+        // Also check for custom logic pattern from unique tag mapping
+        else if (existingMapping.mapping_logic.includes('Custom logic:')) {
+          const customPart = existingMapping.mapping_logic.split('Custom logic:')[1];
+          if (customPart) {
+            customValue = customPart.replace(/^\s*\|\s*/, '').trim();
+          }
+        }
+      }
       
-      // Get unique library custom mapping if available
-      const uniqueLibraryCustomMapping = uniqueMapping?.validation || '';
+      // If no direct custom mapping found, check if unique mapping exists with custom logic
+      if (!customValue && uniqueMapping) {
+        // Look for existing mapping in tag_mappings that might have custom logic for this internal tag
+        const uniqueTagMapping = tagMappings.find(m => m.internal_tag_id === uniqueMapping.id);
+        if (uniqueTagMapping?.mapping_logic && uniqueTagMapping.mapping_logic.includes('Custom logic:')) {
+          const customPart = uniqueTagMapping.mapping_logic.split('Custom logic:')[1];
+          if (customPart) {
+            customValue = customPart.replace(/^\s*\|\s*/, '').trim();
+          }
+        }
+      }
       
       // Determine mapping type: default to 'unique', but switch to 'document' if doc level mapping exists
       const mappingType = hasDocLevelMapping ? 'document' : 'unique';
       
-      // Determine effective mapping field and custom mapping based on precedence
+      // Determine effective mapping field and status based on precedence
       let effectiveMappingField = '';
-      let effectiveCustomMapping = '';
       let mappingStatus: 'mapped' | 'unmapped' | 'error' = 'unmapped';
       
       if (hasDocLevelMapping && docLevelValue) {
@@ -88,21 +106,32 @@ export const TagMappingInterface = () => {
       } else if (existingMapping?.internal_tag_id) {
         // Direct internal tag mapping
         effectiveMappingField = existingMapping.internal_tag_id;
-        effectiveCustomMapping = customValue;
         mappingStatus = 'mapped';
       } else if (uniqueMapping) {
         // Fallback to unique tag library mapping
         effectiveMappingField = uniqueMapping.id;
-        effectiveCustomMapping = uniqueLibraryCustomMapping;
         mappingStatus = 'mapped';
       }
+      
+      // If there's custom mapping but no other mapping, still consider it mapped
+      if (!mappingStatus && customValue) {
+        mappingStatus = 'mapped';
+      }
+      
+      console.log(`Tag ${tag.text}:`, {
+        existingMapping: existingMapping?.mapping_logic,
+        uniqueMapping: uniqueMapping?.name,
+        customValue,
+        effectiveMappingField,
+        mappingStatus
+      });
       
       return {
         id: tag.id,
         tagName: tag.text,
         mappingType: mappingType,
         mappingField: effectiveMappingField,
-        customMapping: effectiveCustomMapping,
+        customMapping: customValue,
         customMappingDocLevel: docLevelValue,
         mappingStatus: mappingStatus,
         isActive: true,
