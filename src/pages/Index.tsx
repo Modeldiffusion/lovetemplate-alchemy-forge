@@ -39,7 +39,7 @@ const Index = () => {
     switch (path) {
       case '/upload':
         return (
-          <div className="space-y-8">
+          <div className="space-y-7">
             <TemplateUpload />
             <TemplateGrid />
           </div>
