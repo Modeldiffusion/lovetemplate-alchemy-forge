@@ -59,16 +59,46 @@ export const TagMappingInterface = () => {
         internal.name.toLowerCase() === tag.text.toLowerCase()
       );
       
+      // Check for document level mapping
+      const hasDocLevelMapping = existingMapping?.mapping_logic?.includes('DocLevel:');
+      const docLevelValue = hasDocLevelMapping 
+        ? existingMapping.mapping_logic.replace('DocLevel: ', '') 
+        : '';
+      
+      // Check for custom mapping
+      const hasCustomMapping = existingMapping?.mapping_logic?.includes('Custom:') && !hasDocLevelMapping;
+      const customValue = hasCustomMapping 
+        ? existingMapping.mapping_logic.replace('Custom: ', '') 
+        : '';
+      
+      // Determine mapping type: default to 'unique', but switch to 'document' if doc level mapping exists
+      const mappingType = hasDocLevelMapping ? 'document' : 'unique';
+      
+      // Determine effective mapping field based on precedence
+      let effectiveMappingField = '';
+      let mappingStatus: 'mapped' | 'unmapped' | 'error' = 'unmapped';
+      
+      if (hasDocLevelMapping && docLevelValue) {
+        // Document level mapping has highest precedence
+        mappingStatus = 'mapped';
+      } else if (existingMapping?.internal_tag_id) {
+        // Direct internal tag mapping
+        effectiveMappingField = existingMapping.internal_tag_id;
+        mappingStatus = 'mapped';
+      } else if (uniqueMapping) {
+        // Fallback to unique tag library mapping
+        effectiveMappingField = uniqueMapping.id;
+        mappingStatus = 'mapped';
+      }
+      
       return {
         id: tag.id,
         tagName: tag.text,
-        mappingType: uniqueMapping ? 'unique' : 'document',
-        mappingField: existingMapping?.internal_tag_id || uniqueMapping?.id,
-        customMapping: existingMapping?.mapping_logic?.includes('Custom:') 
-          ? existingMapping.mapping_logic.replace('Custom: ', '') 
-          : '',
-        customMappingDocLevel: '',
-        mappingStatus: existingMapping ? 'mapped' : (uniqueMapping ? 'mapped' : 'unmapped'),
+        mappingType: mappingType,
+        mappingField: effectiveMappingField,
+        customMapping: customValue,
+        customMappingDocLevel: docLevelValue,
+        mappingStatus: mappingStatus,
         isActive: true,
         templateId: tag.template_id,
         extractedTagId: tag.id
@@ -115,15 +145,33 @@ export const TagMappingInterface = () => {
 
   const handleCustomMappingChange = (mappingId: string, customValue: string, isDocLevel: boolean = false) => {
     setTemplateMappings(prev => 
-      prev.map(mapping => 
-        mapping.id === mappingId 
-          ? { 
-              ...mapping, 
-              [isDocLevel ? 'customMappingDocLevel' : 'customMapping']: customValue,
-              mappingStatus: customValue ? 'mapped' : 'unmapped'
-            }
-          : mapping
-      )
+      prev.map(mapping => {
+        if (mapping.id === mappingId) {
+          const updates: Partial<TemplateTagMapping> = {
+            [isDocLevel ? 'customMappingDocLevel' : 'customMapping']: customValue,
+          };
+          
+          // If document level mapping is provided, automatically switch to document type
+          if (isDocLevel && customValue.trim()) {
+            updates.mappingType = 'document';
+            updates.mappingStatus = 'mapped';
+          } else if (isDocLevel && !customValue.trim()) {
+            // If document level mapping is cleared, revert to unique type and check for unique mapping
+            const uniqueMapping = internalTags.find(internal => 
+              internal.name.toLowerCase() === mapping.tagName.toLowerCase()
+            );
+            updates.mappingType = 'unique';
+            updates.mappingField = uniqueMapping?.id;
+            updates.mappingStatus = uniqueMapping ? 'mapped' : (mapping.customMapping ? 'mapped' : 'unmapped');
+          } else {
+            // Regular custom mapping
+            updates.mappingStatus = customValue ? 'mapped' : 'unmapped';
+          }
+          
+          return { ...mapping, ...updates };
+        }
+        return mapping;
+      })
     );
   };
 
@@ -337,7 +385,6 @@ export const TagMappingInterface = () => {
                       placeholder="Document level mapping..."
                       value={mapping.customMappingDocLevel || ''}
                       onChange={(e) => handleCustomMappingChange(mapping.id, e.target.value, true)}
-                      disabled={mapping.mappingType !== 'document'}
                       className="w-48"
                     />
                   </TableCell>
