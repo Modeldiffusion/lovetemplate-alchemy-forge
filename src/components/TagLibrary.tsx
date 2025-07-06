@@ -31,7 +31,7 @@ interface TagLibraryItem {
 }
 
 export const TagLibrary = () => {
-  const { extractedTags, tagMappings, internalTags, loading, createTagMapping, updateTagMapping } = useExtractedTags();
+  const { extractedTags, tagMappings, internalTags, loading, createTagMapping, updateTagMapping, createInternalTag } = useExtractedTags();
   const { getAllFieldNames, loading: fieldsLoading } = useUploadedFields();
   const [tagLibraryData, setTagLibraryData] = useState<TagLibraryItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -116,9 +116,23 @@ export const TagLibrary = () => {
 
   const handleFieldMapping = async (tagId: string, extractedTagId: string, fieldName: string) => {
     try {
-      // Create a new tag mapping with the selected field
+      // First, try to find an existing internal tag with this field name
+      let internalTag = internalTags.find(tag => tag.name === fieldName);
+      
+      // If not found, create a new internal tag
+      if (!internalTag) {
+        internalTag = await createInternalTag({
+          name: fieldName,
+          category: 'uploaded_fields',
+          description: `Field uploaded from external file`,
+          data_type: 'string'
+        });
+      }
+
+      // Create the mapping with the internal tag ID
       await createTagMapping({
         extracted_tag_id: extractedTagId,
+        internal_tag_id: internalTag.id,
         mapping_logic: `Field mapped to: ${fieldName}`,
         confidence: 95
       });
@@ -127,13 +141,14 @@ export const TagLibrary = () => {
       setTagLibraryData(prev => 
         prev.map(item => 
           item.id === tagId 
-            ? { ...item, mappingField: fieldName, mappingStatus: 'mapped' as const }
+            ? { ...item, mappingField: fieldName, mappingStatus: 'mapped' as const, internalTagId: internalTag.id }
             : item
         )
       );
       
       toast.success(`Tag "${tagLibraryData.find(t => t.id === tagId)?.tagName}" mapped to "${fieldName}"`);
     } catch (error) {
+      console.error('Field mapping error:', error);
       toast.error("Failed to create field mapping");
     }
   };
