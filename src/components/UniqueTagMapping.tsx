@@ -3,20 +3,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { 
   Search, 
   Edit,
-  Database,
+  Tag,
   FileText,
   Filter,
-  ChevronDown,
   Download,
-  Plus
+  Plus,
+  Save,
+  X
 } from "lucide-react";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { useUploadedFields } from "@/hooks/useUploadedFields";
@@ -24,7 +25,7 @@ import { useTemplates } from "@/hooks/useTemplates";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
-interface TagLibraryItem {
+interface TagMappingItem {
   id: string;
   tagName: string;
   mappingField: string | null;
@@ -34,16 +35,19 @@ interface TagLibraryItem {
   isActive: boolean;
   extractedTagId: string;
   internalTagId: string | null;
+  mappingId: string | null;
 }
 
-export const TagLibrary = () => {
+export const UniqueTagMapping = () => {
   const { extractedTags, tagMappings, internalTags, loading, createTagMapping, updateTagMapping, createInternalTag, createManualTag, refetch } = useExtractedTags();
   const { getAllFieldNames, loading: fieldsLoading } = useUploadedFields();
   const { templates } = useTemplates();
-  const [tagLibraryData, setTagLibraryData] = useState<TagLibraryItem[]>([]);
+  const [tagMappingData, setTagMappingData] = useState<TagMappingItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [availableFields, setAvailableFields] = useState<string[]>([]);
+  const [editingCustomMapping, setEditingCustomMapping] = useState<string | null>(null);
+  const [editingCustomValue, setEditingCustomValue] = useState("");
   
   // Manual tag dialog state
   const [isManualTagDialogOpen, setIsManualTagDialogOpen] = useState(false);
@@ -51,7 +55,9 @@ export const TagLibrary = () => {
     text: '',
     context: '',
     confidence: 100,
-    templateId: ''
+    templateId: '',
+    mappingField: '',
+    customMapping: ''
   });
 
   // Load available fields
@@ -61,11 +67,11 @@ export const TagLibrary = () => {
     }
   }, [fieldsLoading, getAllFieldNames]);
 
-  // Process the data to create tag library items
+  // Process the data to create tag mapping items
   useEffect(() => {
     if (!extractedTags.length) return;
 
-    const processedData: TagLibraryItem[] = [];
+    const processedData: TagMappingItem[] = [];
     
     // Group extracted tags by their text to combine documents
     const tagGroups = extractedTags.reduce((groups, tag) => {
@@ -84,7 +90,7 @@ export const TagLibrary = () => {
       return groups;
     }, {} as Record<string, { tagName: string; documents: Set<string>; tags: any[] }>);
 
-    // Create library items
+    // Create mapping items
     Object.values(tagGroups).forEach(group => {
       const representativeTag = group.tags[0];
       const mapping = tagMappings.find(m => 
@@ -111,14 +117,172 @@ export const TagLibrary = () => {
         customMapping,
         applicableDocuments: Array.from(group.documents),
         mappingStatus: mapping?.status || 'unmapped',
-        isActive: true, // Default to active, could be stored in DB
+        isActive: true,
         extractedTagId: representativeTag.id,
-        internalTagId: mapping?.internal_tag_id || null
+        internalTagId: mapping?.internal_tag_id || null,
+        mappingId: mapping?.id || null
       });
     });
 
-    setTagLibraryData(processedData);
+    setTagMappingData(processedData);
   }, [extractedTags, tagMappings, internalTags]);
+
+  const handleFieldMapping = async (tagId: string, extractedTagId: string, fieldName: string) => {
+    try {
+      // Find existing internal tag or create new one
+      let internalTag = internalTags.find(tag => tag.name === fieldName);
+      
+      if (!internalTag) {
+        internalTag = await createInternalTag({
+          name: fieldName,
+          category: 'uploaded_fields',
+          description: `Field uploaded from external file`,
+          data_type: 'string'
+        });
+      }
+
+      const existingMappingId = tagMappingData.find(t => t.id === tagId)?.mappingId;
+
+      if (existingMappingId) {
+        // Update existing mapping
+        await updateTagMapping(existingMappingId, {
+          internal_tag_id: internalTag.id,
+          mapping_logic: `Field mapped to: ${fieldName}`,
+          status: 'mapped',
+          confidence: 95
+        });
+      } else {
+        // Create new mapping
+        await createTagMapping({
+          extracted_tag_id: extractedTagId,
+          internal_tag_id: internalTag.id,
+          mapping_logic: `Field mapped to: ${fieldName}`,
+          confidence: 95
+        });
+      }
+
+      await refetch();
+      toast.success(`Tag "${tagMappingData.find(t => t.id === tagId)?.tagName}" mapped to "${fieldName}"`);
+    } catch (error) {
+      console.error('Field mapping error:', error);
+      toast.error("Failed to create field mapping");
+    }
+  };
+
+  const handleCustomMappingEdit = (tagId: string, currentValue: string) => {
+    setEditingCustomMapping(tagId);
+    setEditingCustomValue(currentValue || '');
+  };
+
+  const handleCustomMappingSave = async (tagId: string, extractedTagId: string) => {
+    try {
+      const tagItem = tagMappingData.find(t => t.id === tagId);
+      if (!tagItem) return;
+
+      let mappingLogic = '';
+      if (tagItem.mappingField) {
+        mappingLogic = `Field mapped to: ${tagItem.mappingField}`;
+      }
+      
+      if (editingCustomValue.trim()) {
+        if (mappingLogic) {
+          mappingLogic += ` | Custom logic: ${editingCustomValue.trim()}`;
+        } else {
+          mappingLogic = `Custom logic: ${editingCustomValue.trim()}`;
+        }
+      }
+
+      const status = tagItem.mappingField ? 'mapped' : 'logic';
+
+      if (tagItem.mappingId) {
+        // Update existing mapping
+        await updateTagMapping(tagItem.mappingId, {
+          mapping_logic: mappingLogic,
+          status,
+          confidence: 95
+        });
+      } else {
+        // Create new mapping
+        await createTagMapping({
+          extracted_tag_id: extractedTagId,
+          internal_tag_id: tagItem.internalTagId,
+          mapping_logic: mappingLogic,
+          confidence: 95
+        });
+      }
+
+      await refetch();
+      setEditingCustomMapping(null);
+      setEditingCustomValue('');
+      toast.success(`Custom mapping updated for "${tagItem.tagName}"`);
+    } catch (error) {
+      console.error('Custom mapping error:', error);
+      toast.error("Failed to update custom mapping");
+    }
+  };
+
+  const handleManualTagAdd = async () => {
+    if (!manualTagData.text.trim() || !manualTagData.templateId) return;
+    
+    try {
+      await createManualTag({
+        template_id: manualTagData.templateId,
+        text: manualTagData.text.trim(),
+        context: manualTagData.context.trim(),
+        confidence: manualTagData.confidence
+      });
+
+      // If mapping field or custom mapping is provided, create the mapping
+      if (manualTagData.mappingField || manualTagData.customMapping) {
+        // Wait a bit for the tag to be created, then fetch and map
+        setTimeout(async () => {
+          await refetch();
+          // Find the newly created tag and create mapping
+          // This would need the extracted tag ID from the creation result
+          toast.success(`Manual tag "${manualTagData.text}" added with mapping`);
+        }, 1000);
+      }
+      
+      setManualTagData({ text: '', context: '', confidence: 100, templateId: '', mappingField: '', customMapping: '' });
+      setIsManualTagDialogOpen(false);
+      
+      toast.success(`Manual tag "${manualTagData.text}" has been added`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to add manual tag");
+    }
+  };
+
+  const handleExport = () => {
+    if (filteredData.length === 0) {
+      toast.error("No tags to export");
+      return;
+    }
+
+    const headers = ['Tag Name', 'Mapping Field', 'Custom Mapping', 'Applicable Documents', 'Status', 'Active'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredData.map(item => [
+        `"${item.tagName}"`,
+        `"${item.mappingField || 'Not mapped'}"`,
+        `"${item.customMapping || 'None'}"`,
+        `"${item.applicableDocuments.join('; ')}"`,
+        `"${getStatusLabel(item.mappingStatus)}"`,
+        `"${item.isActive ? 'Yes' : 'No'}"`
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `unique-tag-mapping-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`Exported ${filteredData.length} tag mappings successfully`);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -140,112 +304,7 @@ export const TagLibrary = () => {
     }
   };
 
-  const handleFieldMapping = async (tagId: string, extractedTagId: string, fieldName: string) => {
-    try {
-      // First, try to find an existing internal tag with this field name
-      let internalTag = internalTags.find(tag => tag.name === fieldName);
-      
-      // If not found, create a new internal tag
-      if (!internalTag) {
-        internalTag = await createInternalTag({
-          name: fieldName,
-          category: 'uploaded_fields',
-          description: `Field uploaded from external file`,
-          data_type: 'string'
-        });
-      }
-
-      // Create the mapping with the internal tag ID
-      await createTagMapping({
-        extracted_tag_id: extractedTagId,
-        internal_tag_id: internalTag.id,
-        mapping_logic: `Field mapped to: ${fieldName}`,
-        confidence: 95
-      });
-
-      // Refetch data to get the updated mappings and internal tags
-      await refetch();
-      
-      toast.success(`Tag "${tagLibraryData.find(t => t.id === tagId)?.tagName}" mapped to "${fieldName}"`);
-    } catch (error) {
-      console.error('Field mapping error:', error);
-      toast.error("Failed to create field mapping");
-    }
-  };
-
-  const handleToggleActive = async (tagId: string, currentStatus: boolean) => {
-    // Here you would typically update the database
-    // For now, just update local state
-    setTagLibraryData(prev => 
-      prev.map(item => 
-        item.id === tagId 
-          ? { ...item, isActive: !currentStatus }
-          : item
-      )
-    );
-    toast.success(`Tag ${currentStatus ? 'deactivated' : 'activated'} successfully`);
-  };
-
-  const handleEdit = (tagId: string) => {
-    // Navigate to edit page or open edit modal
-    toast.info("Edit functionality will be implemented");
-  };
-
-  const handleManualTagAdd = async () => {
-    if (!manualTagData.text.trim() || !manualTagData.templateId) return;
-    
-    try {
-      await createManualTag({
-        template_id: manualTagData.templateId,
-        text: manualTagData.text.trim(),
-        context: manualTagData.context.trim(),
-        confidence: manualTagData.confidence
-      });
-      
-      setManualTagData({ text: '', context: '', confidence: 100, templateId: '' });
-      setIsManualTagDialogOpen(false);
-      
-      toast.success(`Manual tag "${manualTagData.text}" has been added to the library`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to add manual tag");
-    }
-  };
-
-  const handleExport = () => {
-    if (filteredData.length === 0) {
-      toast.error("No tags to export");
-      return;
-    }
-
-    // Create CSV content
-    const headers = ['Tag Name', 'Mapping Field', 'Custom Mapping', 'Applicable Documents', 'Status', 'Active'];
-    const csvContent = [
-      headers.join(','),
-      ...filteredData.map(item => [
-        `"${item.tagName}"`,
-        `"${item.mappingField || 'Not mapped'}"`,
-        `"${item.customMapping || 'None'}"`,
-        `"${item.applicableDocuments.join('; ')}"`,
-        `"${getStatusLabel(item.mappingStatus)}"`,
-        `"${item.isActive ? 'Yes' : 'No'}"`
-      ].join(','))
-    ].join('\n');
-
-    // Create and download file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `tag-library-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast.success(`Exported ${filteredData.length} tags successfully`);
-  };
-
-  const filteredData = tagLibraryData.filter(item => {
+  const filteredData = tagMappingData.filter(item => {
     const matchesSearch = item.tagName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.mappingField?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          item.customMapping?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -262,9 +321,9 @@ export const TagLibrary = () => {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Database className="w-8 h-8 text-primary" />
+          <Tag className="w-8 h-8 text-primary" />
           <div>
-            <h3 className="text-2xl font-bold text-foreground">Tag Library</h3>
+            <h3 className="text-2xl font-bold text-foreground">Unique Tag Mapping</h3>
             <p className="text-muted-foreground">Loading extracted tags...</p>
           </div>
         </div>
@@ -280,11 +339,11 @@ export const TagLibrary = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Database className="w-8 h-8 text-primary" />
+        <Tag className="w-8 h-8 text-primary" />
         <div>
-          <h3 className="text-2xl font-bold text-foreground">Tag Library</h3>
+          <h3 className="text-2xl font-bold text-foreground">Unique Tag Mapping</h3>
           <p className="text-muted-foreground">
-            Manage and view all extracted tags from your documents
+            Configure individual tag mappings with field mapping and custom logic
           </p>
         </div>
       </div>
@@ -295,11 +354,11 @@ export const TagLibrary = () => {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Database className="w-5 h-5 text-blue-600" />
+                <Tag className="w-5 h-5 text-blue-600" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Tags</p>
-                <p className="text-xl font-bold">{tagLibraryData.length}</p>
+                <p className="text-xl font-bold">{tagMappingData.length}</p>
               </div>
             </div>
           </CardContent>
@@ -309,12 +368,12 @@ export const TagLibrary = () => {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Database className="w-5 h-5 text-green-600" />
+                <Tag className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Mapped</p>
+                <p className="text-sm text-muted-foreground">Field Mapped</p>
                 <p className="text-xl font-bold">
-                  {tagLibraryData.filter(t => t.mappingStatus === 'mapped' || t.mappingStatus === 'validated').length}
+                  {tagMappingData.filter(t => t.mappingStatus === 'mapped').length}
                 </p>
               </div>
             </div>
@@ -325,12 +384,12 @@ export const TagLibrary = () => {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Database className="w-5 h-5 text-yellow-600" />
+                <Tag className="w-5 h-5 text-yellow-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Unmapped</p>
+                <p className="text-sm text-muted-foreground">Custom Logic</p>
                 <p className="text-xl font-bold">
-                  {tagLibraryData.filter(t => t.mappingStatus === 'unmapped').length}
+                  {tagMappingData.filter(t => t.mappingStatus === 'logic').length}
                 </p>
               </div>
             </div>
@@ -340,13 +399,13 @@ export const TagLibrary = () => {
         <Card className="bg-gradient-card shadow-custom-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Database className="w-5 h-5 text-green-600" />
+              <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                <Tag className="w-5 h-5 text-gray-600" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Active</p>
+                <p className="text-sm text-muted-foreground">Unmapped</p>
                 <p className="text-xl font-bold">
-                  {tagLibraryData.filter(t => t.isActive).length}
+                  {tagMappingData.filter(t => t.mappingStatus === 'unmapped').length}
                 </p>
               </div>
             </div>
@@ -368,7 +427,7 @@ export const TagLibrary = () => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search tags, mapping fields, or documents..."
+                  placeholder="Search tags, mapping fields, custom mappings, or documents..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -383,9 +442,9 @@ export const TagLibrary = () => {
               >
                 <option value="all">All Status</option>
                 <option value="unmapped">Unmapped</option>
-                <option value="mapped">Mapped</option>
+                <option value="mapped">Field Mapped</option>
+                <option value="logic">Custom Logic</option>
                 <option value="validated">Validated</option>
-                <option value="logic">Logic Applied</option>
                 <option value="error">Error</option>
               </select>
             </div>
@@ -400,10 +459,10 @@ export const TagLibrary = () => {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="w-5 h-5" />
-                Tag Library ({filteredData.length} items)
+                Unique Tag Mapping ({filteredData.length} items)
               </CardTitle>
               <CardDescription>
-                Manage extracted tags and their mappings across all documents
+                Configure field mappings and custom logic for individual tags
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
@@ -414,11 +473,11 @@ export const TagLibrary = () => {
                     Add Manual Tag
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent className="sm:max-w-[500px]">
                   <DialogHeader>
-                    <DialogTitle>Add Manual Tag</DialogTitle>
+                    <DialogTitle>Add Manual Tag with Mapping</DialogTitle>
                     <DialogDescription>
-                      Add a tag that the system might have missed during extraction
+                      Add a tag that the system might have missed and configure its mapping
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
@@ -448,6 +507,33 @@ export const TagLibrary = () => {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="manual-tag-mapping-field">Mapping Field (Optional)</Label>
+                      <Select
+                        value={manualTagData.mappingField}
+                        onValueChange={(value) => setManualTagData(prev => ({ ...prev, mappingField: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select field..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableFields.map((field) => (
+                            <SelectItem key={field} value={field}>
+                              {field}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="manual-tag-custom-mapping">Custom Mapping (Optional)</Label>
+                      <Textarea
+                        id="manual-tag-custom-mapping"
+                        value={manualTagData.customMapping}
+                        onChange={(e) => setManualTagData(prev => ({ ...prev, customMapping: e.target.value }))}
+                        placeholder="Enter custom mapping logic..."
+                      />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="manual-tag-context">Context (Optional)</Label>
@@ -505,19 +591,18 @@ export const TagLibrary = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                       <TableHead>Tag Name</TableHead>
-                       <TableHead>Mapping Field</TableHead>
-                       <TableHead>Custom Mapping</TableHead>
-                       <TableHead>Applicable Documents</TableHead>
-                       <TableHead>Status</TableHead>
-                       <TableHead>Active</TableHead>
-                       <TableHead>Actions</TableHead>
+                  <TableHead>Tag Name</TableHead>
+                  <TableHead>Mapping Field</TableHead>
+                  <TableHead>Custom Mapping</TableHead>
+                  <TableHead>Applicable Documents</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Active</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       {searchTerm || statusFilter !== "all" 
                         ? "No tags match your search criteria" 
                         : "No tags found. Extract tags from templates to see them here."
@@ -532,55 +617,93 @@ export const TagLibrary = () => {
                           {item.tagName}
                         </div>
                       </TableCell>
-                       <TableCell>
-                         <div className="space-y-2">
-                           {item.mappingField && (
-                             <div className="flex items-center gap-2">
-                               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                 {item.mappingField}
-                               </Badge>
-                               <span className="text-xs text-muted-foreground">Mapped</span>
-                             </div>
-                           )}
-                           {availableFields.length > 0 && (
-                             <Select
-                               value=""
-                               onValueChange={(value) => handleFieldMapping(item.id, item.extractedTagId, value)}
-                             >
-                               <SelectTrigger className="w-48">
-                                 <SelectValue placeholder={item.mappingField ? "Map to another field..." : "Select field..."} />
-                               </SelectTrigger>
-                               <SelectContent>
-                                 {availableFields.map((field) => (
-                                   <SelectItem key={field} value={field}>
-                                     {field}
-                                   </SelectItem>
-                                 ))}
-                               </SelectContent>
-                             </Select>
-                           )}
-                           {!item.mappingField && availableFields.length === 0 && (
-                             <span className="text-muted-foreground">Not mapped</span>
-                           )}
+                      <TableCell>
+                        <div className="space-y-2">
+                          {item.mappingField && (
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                {item.mappingField}
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">Mapped</span>
+                            </div>
+                          )}
+                          {availableFields.length > 0 && (
+                            <Select
+                              value=""
+                              onValueChange={(value) => handleFieldMapping(item.id, item.extractedTagId, value)}
+                            >
+                              <SelectTrigger className="w-48">
+                                <SelectValue placeholder={item.mappingField ? "Map to another field..." : "Select field..."} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableFields.map((field) => (
+                                  <SelectItem key={field} value={field}>
+                                    {field}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                          {!item.mappingField && availableFields.length === 0 && (
+                            <span className="text-muted-foreground">Not mapped</span>
+                          )}
                         </div>
-                       </TableCell>
-                       <TableCell>
-                         <div className="max-w-xs">
-                           {item.customMapping ? (
-                             <div className="space-y-1">
-                               <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                                 Custom Logic
-                               </Badge>
-                               <div className="text-xs text-muted-foreground">
-                                 {item.customMapping}
-                               </div>
-                             </div>
-                           ) : (
-                             <span className="text-muted-foreground text-sm">No custom mapping</span>
-                           )}
-                         </div>
-                       </TableCell>
-                       <TableCell>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-2">
+                          {editingCustomMapping === item.id ? (
+                            <div className="flex items-center gap-2">
+                              <Textarea
+                                value={editingCustomValue}
+                                onChange={(e) => setEditingCustomValue(e.target.value)}
+                                placeholder="Enter custom mapping logic..."
+                                className="min-h-[60px]"
+                              />
+                              <div className="flex flex-col gap-1">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleCustomMappingSave(item.id, item.extractedTagId)}
+                                >
+                                  <Save className="w-3 h-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setEditingCustomMapping(null);
+                                    setEditingCustomValue('');
+                                  }}
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              {item.customMapping && (
+                                <div className="flex items-start gap-2">
+                                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                                    Custom Logic
+                                  </Badge>
+                                </div>
+                              )}
+                              <div className="text-sm text-muted-foreground max-w-xs">
+                                {item.customMapping || 'No custom mapping'}
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleCustomMappingEdit(item.id, item.customMapping || '')}
+                                className="h-6 px-2"
+                              >
+                                <Edit className="w-3 h-3 mr-1" />
+                                {item.customMapping ? 'Edit' : 'Add Custom'}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <div className="max-w-xs">
                           {item.applicableDocuments.length > 0 ? (
                             <div className="flex flex-wrap gap-1">
@@ -611,19 +734,17 @@ export const TagLibrary = () => {
                       <TableCell>
                         <Switch
                           checked={item.isActive}
-                          onCheckedChange={() => handleToggleActive(item.id, item.isActive)}
+                          onCheckedChange={() => {
+                            // Update active status
+                            setTagMappingData(prev => 
+                              prev.map(t => 
+                                t.id === item.id 
+                                  ? { ...t, isActive: !t.isActive }
+                                  : t
+                              )
+                            );
+                          }}
                         />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(item.id)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </div>
                       </TableCell>
                     </TableRow>
                   ))

@@ -5,6 +5,7 @@ import { Settings, Upload, Link, Tag, FileSpreadsheet } from "lucide-react";
 import { UploadFields } from "./UploadFields";
 import { MappingUpload } from "./MappingUpload";
 import { TagMappingInterface } from "./TagMappingInterface";
+import { UniqueTagMapping } from "./UniqueTagMapping";
 
 export const MappingInterface = () => {
   return (
@@ -49,22 +50,7 @@ export const MappingInterface = () => {
         </TabsContent>
 
         <TabsContent value="unique-mapping" className="space-y-6">
-          <Card className="bg-gradient-card shadow-custom-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Tag className="w-5 h-5" />
-                Unique Tag Mapping
-              </CardTitle>
-              <CardDescription>
-                Configure unique mappings for specific tags.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                This functionality will be implemented soon.
-              </div>
-            </CardContent>
-          </Card>
+          <UniqueTagMapping />
         </TabsContent>
 
         <TabsContent value="template-mapping" className="space-y-6">
