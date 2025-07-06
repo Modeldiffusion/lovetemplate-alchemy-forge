@@ -3,8 +3,12 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, FileText, Zap, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, FileText, Zap, CheckCircle2, AlertCircle, RefreshCw, Target } from "lucide-react";
 import { useTemplates } from "@/hooks/useTemplates";
 import { useExtractedTags } from "@/hooks/useExtractedTags";
 import { useToast } from "@/hooks/use-toast";
@@ -21,6 +25,14 @@ export const SingleTemplateExtraction = () => {
   const [progress, setProgress] = useState(0);
   const [extractionResults, setExtractionResults] = useState<any>(null);
 
+  // Delimiter configuration state
+  const [delimiterPairs, setDelimiterPairs] = useState<Array<{start: string, end: string}>>([
+    { start: '[', end: ']' }
+  ]);
+  const [includeDelimiters, setIncludeDelimiters] = useState(true);
+  const [extractionMethod, setExtractionMethod] = useState<"regex" | "delimiters">("delimiters");
+  const [regexPattern, setRegexPattern] = useState("");
+
   const template = templates.find(t => t.id === templateId);
 
   useEffect(() => {
@@ -34,6 +46,9 @@ export const SingleTemplateExtraction = () => {
     if (!templateId) return;
     
     console.log('Starting tag extraction for template:', templateId);
+    console.log('Delimiter pairs:', delimiterPairs);
+    console.log('Extraction method:', extractionMethod);
+    
     setExtractionStatus('extracting');
     setProgress(10);
 
@@ -49,7 +64,15 @@ export const SingleTemplateExtraction = () => {
         });
       }, 500);
 
-      const results = await extractTags(templateId);
+      const extractionConfig = {
+        method: extractionMethod,
+        delimiterPairs,
+        includeDelimiters,
+        regexPattern: extractionMethod === 'regex' ? regexPattern : undefined,
+        caseSensitive: false
+      };
+
+      const results = await extractTags(templateId, extractionConfig);
       
       clearInterval(progressInterval);
       setProgress(100);
@@ -179,6 +202,142 @@ export const SingleTemplateExtraction = () => {
               <p className="font-medium">{format(new Date(template.uploaded_at), 'MMM d, yyyy')}</p>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Extraction Configuration */}
+      <Card className="bg-gradient-card shadow-custom-md">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Target className="w-5 h-5" />
+            <span>Extraction Configuration</span>
+          </CardTitle>
+          <CardDescription>
+            Configure how tags should be extracted from the document
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Tabs value={extractionMethod} onValueChange={(value) => setExtractionMethod(value as "regex" | "delimiters")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="delimiters">Delimiter-based</TabsTrigger>
+              <TabsTrigger value="regex">Regex Pattern</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="delimiters" className="space-y-4">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Custom Delimiter Pairs</Label>
+                  <div className="space-y-3">
+                    {delimiterPairs.map((pair, index) => (
+                      <div key={index} className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+                        <div className="flex items-center gap-2 flex-1">
+                          <Input
+                            placeholder="Start delimiter (e.g., [, <<, @)"
+                            value={pair.start}
+                            onChange={(e) => {
+                              const newPairs = [...delimiterPairs];
+                              newPairs[index].start = e.target.value;
+                              setDelimiterPairs(newPairs);
+                            }}
+                            className="w-32"
+                          />
+                          <span className="text-muted-foreground text-sm">...</span>
+                          <Input
+                            placeholder="End delimiter (e.g., ], >>, ,)"
+                            value={pair.end}
+                            onChange={(e) => {
+                              const newPairs = [...delimiterPairs];
+                              newPairs[index].end = e.target.value;
+                              setDelimiterPairs(newPairs);
+                            }}
+                            className="w-32"
+                          />
+                        </div>
+                        <Badge variant="outline" className="bg-background">
+                          {pair.start}TAG{pair.end}
+                        </Badge>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setDelimiterPairs(prev => prev.filter((_, i) => i !== index));
+                          }}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setDelimiterPairs(prev => [...prev, { start: '', end: '' }]);
+                    }}
+                    className="mt-2"
+                  >
+                    + Add Delimiter Pair
+                  </Button>
+                  
+                  <p className="text-xs text-muted-foreground">
+                    Add custom delimiter pairs to extract tags. Examples: [tag], {'<<tag>>'}, {'{tag}'}, @tag (with comma/space)
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2 mb-4">
+                <input
+                  type="checkbox"
+                  id="includeDelimiters"
+                  checked={includeDelimiters}
+                  onChange={(e) => setIncludeDelimiters(e.target.checked)}
+                  className="rounded"
+                />
+                <Label htmlFor="includeDelimiters">Include delimiters in extracted tags</Label>
+              </div>
+              
+              <div className="bg-muted/50 p-3 rounded-lg">
+                <p className="text-sm font-medium mb-1">Current delimiter pairs will extract:</p>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {delimiterPairs.filter(pair => pair.start && pair.end).map((pair, index) => (
+                    <code key={index} className="bg-muted px-2 py-1 rounded text-xs">
+                      {pair.start}TAG_NAME{pair.end}
+                    </code>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Tags can be in tables, paragraphs, or footers. Use @ with comma/space for special tags.
+                </p>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="regex" className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="regexPattern">Regular Expression Pattern</Label>
+                <Textarea
+                  id="regexPattern"
+                  value={regexPattern}
+                  onChange={(e) => setRegexPattern(e.target.value)}
+                  placeholder="\\[([A-Z_]+)\\]"
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter a regex pattern to match tags. Use capturing groups to extract the tag content.
+                </p>
+              </div>
+              <div className="bg-muted/50 p-3 rounded-lg">
+                <p className="text-sm font-medium mb-1">Example Pattern:</p>
+                <code className="text-sm bg-muted px-1 rounded">\\[([A-Z_]+)\\]</code>
+                <p className="text-xs text-muted-foreground mt-1">
+                  This pattern matches tags like [COMPANY_NAME], [DATE], etc.
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
