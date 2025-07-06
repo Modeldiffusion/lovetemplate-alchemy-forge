@@ -3,6 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Upload, Link, Tag, FileSpreadsheet } from "lucide-react";
 import { UploadFields } from "./UploadFields";
+import { MappingUpload } from "./MappingUpload";
+import { TagMappingInterface } from "./TagMappingInterface";
 
 export const MappingInterface = () => {
   return (
@@ -43,22 +45,7 @@ export const MappingInterface = () => {
         </TabsContent>
 
         <TabsContent value="upload-mapping" className="space-y-6">
-          <Card className="bg-gradient-card shadow-custom-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5" />
-                Upload Mapping Details
-              </CardTitle>
-              <CardDescription>
-                Upload detailed mapping configurations and rules.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                This functionality will be implemented soon.
-              </div>
-            </CardContent>
-          </Card>
+          <MappingUpload />
         </TabsContent>
 
         <TabsContent value="unique-mapping" className="space-y-6">
@@ -81,22 +68,7 @@ export const MappingInterface = () => {
         </TabsContent>
 
         <TabsContent value="template-mapping" className="space-y-6">
-          <Card className="bg-gradient-card shadow-custom-md">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Link className="w-5 h-5" />
-                Template Field Mapping
-              </CardTitle>
-              <CardDescription>
-                Map template fields to your internal field definitions.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                This functionality will be implemented soon.
-              </div>
-            </CardContent>
-          </Card>
+          <TagMappingInterface />
         </TabsContent>
       </Tabs>
     </div>

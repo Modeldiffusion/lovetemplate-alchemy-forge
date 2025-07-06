@@ -461,48 +461,80 @@ export const TagMappingInterface = () => {
                     <p className="text-xs text-muted-foreground truncate">{sourceTag.context}</p>
                   </div>
 
-                  {/* Internal Mapping */}
-                  <div className="col-span-3">
-                    <Select 
-                      value={mapping?.internal_tag_id || ""} 
-                      onValueChange={(value) => handleMappingUpdate(sourceTag.id, { 
-                        internal_tag_id: value, 
-                        status: 'mapped'
-                      })}
-                    >
-                      <SelectTrigger className="h-8">
-                        <SelectValue placeholder="Select internal tag..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {internalTags.map(tag => (
-                          <SelectItem key={tag.id} value={tag.id}>
-                            <div className="flex items-center space-x-2">
-                              <code className="text-xs">{tag.name}</code>
-                              <Badge variant="outline" className="text-xs">{tag.category}</Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {mapping?.internal_tag_id && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {internalTags.find(t => t.id === mapping.internal_tag_id)?.description}
-                      </p>
-                    )}
-                  </div>
+                   {/* Internal Mapping */}
+                   <div className="col-span-3 space-y-2">
+                     <Select 
+                       value={mapping?.internal_tag_id || ""} 
+                       onValueChange={(value) => handleMappingUpdate(sourceTag.id, { 
+                         internal_tag_id: value, 
+                         status: 'mapped'
+                       })}
+                     >
+                       <SelectTrigger className="h-8">
+                         <SelectValue placeholder="Select internal tag..." />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {internalTags.map(tag => (
+                           <SelectItem key={tag.id} value={tag.id}>
+                             <div className="flex items-center space-x-2">
+                               <code className="text-xs">{tag.name}</code>
+                               <Badge variant="outline" className="text-xs">{tag.category}</Badge>
+                             </div>
+                           </SelectItem>
+                         ))}
+                       </SelectContent>
+                     </Select>
+                     
+                     {/* Custom Mapping Field */}
+                     <Input
+                       placeholder="Or enter custom mapping..."
+                       value={mapping?.mapping_logic?.includes('Custom:') ? mapping.mapping_logic.replace('Custom: ', '') : ''}
+                       onChange={(e) => {
+                         if (e.target.value.trim()) {
+                           handleMappingUpdate(sourceTag.id, { 
+                             mapping_logic: `Custom: ${e.target.value}`,
+                             status: 'mapped'
+                           });
+                         }
+                       }}
+                       className="h-8 text-xs"
+                     />
+                     
+                     {mapping?.internal_tag_id && (
+                       <p className="text-xs text-muted-foreground">
+                         {internalTags.find(t => t.id === mapping.internal_tag_id)?.description}
+                       </p>
+                     )}
+                     
+                     {mapping?.mapping_logic?.includes('Custom:') && (
+                       <Badge variant="secondary" className="text-xs">
+                         Custom Mapping Applied
+                       </Badge>
+                     )}
+                   </div>
 
-                  {/* Mapping Logic */}
-                  <div className="col-span-3">
-                    <Textarea
-                      placeholder="Custom mapping logic (JS)..."
-                      value={mapping?.mapping_logic || ""}
-                      onChange={(e) => handleMappingUpdate(sourceTag.id, { 
-                        mapping_logic: e.target.value,
-                        status: e.target.value ? 'logic' : (mapping?.internal_tag_id ? 'mapped' : 'unmapped')
-                      })}
-                      className="h-8 text-xs font-mono resize-none"
-                    />
-                  </div>
+                   {/* Current Mapping Display */}
+                   <div className="col-span-3">
+                     <div className="space-y-1">
+                       {mapping?.internal_tag_id && (
+                         <div className="flex items-center gap-2">
+                           <Badge variant="outline" className="text-xs">
+                             Mapped: {internalTags.find(t => t.id === mapping.internal_tag_id)?.name}
+                           </Badge>
+                         </div>
+                       )}
+                       {mapping?.mapping_logic && (
+                         <div className="text-xs font-mono bg-muted p-2 rounded">
+                           {mapping.mapping_logic}
+                         </div>
+                       )}
+                       {!mapping?.internal_tag_id && !mapping?.mapping_logic && (
+                         <div className="text-xs text-muted-foreground italic">
+                           No mapping defined
+                         </div>
+                       )}
+                     </div>
+                   </div>
 
                   {/* Status */}
                   <div className="col-span-1 pt-1">
