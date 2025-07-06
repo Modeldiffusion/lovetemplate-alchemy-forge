@@ -11,10 +11,12 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { DocumentViewer } from "./DocumentViewer";
 
 export const TemplateGrid = () => {
   const { templates, loading, error, refetch, deleteTemplate } = useTemplates();
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewingTemplate, setViewingTemplate] = useState<Template | null>(null);
   const { toast } = useToast();
 
   const filteredTemplates = templates.filter(template =>
@@ -50,33 +52,7 @@ export const TemplateGrid = () => {
   const handleView = async (template: Template) => {
     console.log('View clicked for template:', template);
     console.log('Template metadata:', template.metadata);
-    try {
-      if (template.metadata && typeof template.metadata === 'object') {
-        const metadata = template.metadata as any;
-        console.log('Metadata content:', metadata);
-        const content = metadata.extractedText || metadata.content || 'No content available';
-        console.log('Content to show:', content.substring(0, 100) + '...');
-        
-        // Create a simple modal-like display using alert for now
-        // In a real app, you'd want to use a proper modal component
-        const preview = content.length > 500 ? content.substring(0, 500) + '...' : content;
-        alert(`Template: ${template.name}\n\nContent Preview:\n${preview}`);
-      } else {
-        console.log('No metadata found for template');
-        toast({
-          title: "No content available",
-          description: "This template doesn't have processed content to view",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('View error:', error);
-      toast({
-        title: "View failed",
-        description: "Failed to view template content",
-        variant: "destructive"
-      });
-    }
+    setViewingTemplate(template);
   };
 
   const handleDownload = async (template: Template) => {
@@ -186,6 +162,14 @@ export const TemplateGrid = () => {
 
   return (
     <div className="space-y-6">
+      {/* Document Viewer Modal */}
+      {viewingTemplate && (
+        <DocumentViewer 
+          template={viewingTemplate} 
+          onClose={() => setViewingTemplate(null)} 
+        />
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-2xl font-bold text-foreground">Uploaded Templates</h3>
