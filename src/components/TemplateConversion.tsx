@@ -133,7 +133,7 @@ export const TemplateConversion = () => {
           internal.name.toLowerCase() === tag.text.toLowerCase()
         );
 
-        // Check for document level mapping first
+        // Check for document level mapping first (highest priority)
         const hasDocLevelMapping = mapping?.mapping_logic?.includes('DocLevel:');
         if (hasDocLevelMapping) {
           const docLevelValue = mapping.mapping_logic.replace('DocLevel: ', '').trim();
@@ -147,7 +147,7 @@ export const TemplateConversion = () => {
           }
         }
 
-        // Check for unique tag library mapping
+        // Check for unique tag library mapping (field mapping)
         if (mapping?.internal_tag_id || uniqueMapping) {
           const internalTag = internalTags.find(t => 
             t.id === mapping?.internal_tag_id || t.id === uniqueMapping?.id
@@ -163,7 +163,7 @@ export const TemplateConversion = () => {
           }
         }
 
-        // Check for custom mapping
+        // Check for custom mapping (lowest priority after field mapping)
         if (mapping?.mapping_logic) {
           let customValue = '';
           if (mapping.mapping_logic.includes('Custom:')) {
@@ -185,7 +185,7 @@ export const TemplateConversion = () => {
           }
         }
 
-        // Retain original tag
+        // Retain original tag if no mapping found
         return {
           original: tag.text,
           replacement: tag.text,
@@ -194,35 +194,43 @@ export const TemplateConversion = () => {
         };
       });
 
-      // Generate converted content (simulate document conversion)
-      const originalContent = `Template: ${template.name}\n\nOriginal Content:\n` + 
-        templateTags.map(tag => `Tag: ${tag.text} (Context: ${tag.context || 'N/A'})`).join('\n');
+      // Simulate processing the actual template file content
+      // In a real implementation, this would read the uploaded file from storage
+      // and process the actual Word document while preserving formatting
       
-      let convertedContent = originalContent;
-      processedTags.forEach(tag => {
-        if (tag.replaced) {
-          // Replace with color coding for replaced tags
-          const coloredReplacement = `[REPLACED: ${tag.replacement}]`;
-          convertedContent = convertedContent.replace(tag.original, coloredReplacement);
-        }
-      });
+      const originalContent = `Template: ${template.name}
+File Type: ${template.file_type || 'Unknown'}
+Original Size: ${template.file_size ? `${(template.file_size / 1024).toFixed(2)} KB` : 'Unknown'}
 
+=== ORIGINAL CONTENT ===
+${templateTags.map(tag => `${tag.text} (found at position ${tag.position}, context: "${tag.context || 'N/A'}")`).join('\n')}
+
+=== CONVERSION MAPPING ===
+${processedTags.map(tag => 
+  `${tag.original} → ${tag.replaced ? `[BLUE HIGHLIGHT: ${tag.replacement}]` : tag.replacement} (${tag.type})`
+).join('\n')}
+
+=== NOTE ===
+In production, this would process the actual uploaded ${template.file_type} file,
+replace tags while preserving original formatting, fonts, and alignment,
+and highlight replaced content in blue color.`;
+      
       // Store conversion results
       setConversionResults(prev => new Map(prev.set(templateId, processedTags)));
 
-      // Update conversion data
+      // Update conversion data with enhanced content
       setConversionData(prev => prev.map(item => 
         item.id === templateId 
           ? { 
               ...item, 
               status: 'completed', 
               lastConverted: new Date().toISOString(),
-              convertedContent 
+              convertedContent: originalContent
             }
           : item
       ));
 
-      toast.success(`Template "${template.name}" converted successfully! ${processedTags.filter(t => t.replaced).length} tags replaced.`);
+      toast.success(`Template "${template.name}" converted! ${processedTags.filter(t => t.replaced).length} tags will be highlighted in blue when downloaded as Word document.`);
       
     } catch (error) {
       toast.error('Conversion failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -338,21 +346,79 @@ Status: ${template.status}`;
   const handleDownloadConverted = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
     const conversionResult = conversionData.find(c => c.id === templateId);
+    const processedTags = conversionResults.get(templateId);
     
-    if (!template || !conversionResult?.convertedContent) {
+    if (!template || !conversionResult?.convertedContent || !processedTags) {
       toast.error('No converted content available');
       return;
     }
 
-    const blob = new Blob([conversionResult.convertedContent], { type: 'text/plain' });
+    // Generate HTML content that simulates a Word document with blue highlighting
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>${template.name} - Converted</title>
+    <style>
+        body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; margin: 1in; }
+        .header { text-align: center; font-weight: bold; margin-bottom: 20px; }
+        .replaced-tag { color: #0066CC; font-weight: bold; background-color: #E6F3FF; padding: 2px; }
+        .conversion-info { border: 1px solid #ccc; padding: 10px; margin: 20px 0; background-color: #f9f9f9; }
+        .tag-mapping { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Converted Template: ${template.name}</h1>
+        <p>Original File: ${template.file_type || 'Unknown'} | Size: ${template.file_size ? `${(template.file_size / 1024).toFixed(2)} KB` : 'Unknown'}</p>
+        <p>Converted on: ${new Date().toLocaleDateString()}</p>
+    </div>
+
+    <div class="conversion-info">
+        <h3>Tag Conversion Summary</h3>
+        <p><strong>Total Tags:</strong> ${processedTags.length}</p>
+        <p><strong>Replaced Tags:</strong> ${processedTags.filter(t => t.replaced).length} (highlighted in blue)</p>
+        <p><strong>Unchanged Tags:</strong> ${processedTags.filter(t => !t.replaced).length}</p>
+    </div>
+
+    <h3>Converted Content Preview</h3>
+    <div class="content">
+        ${processedTags.map(tag => `
+            <div class="tag-mapping">
+                Original: "${tag.original}" → 
+                ${tag.replaced ? 
+                  `<span class="replaced-tag">${tag.replacement}</span> (${tag.type})` : 
+                  `"${tag.replacement}" (unchanged)`
+                }
+            </div>
+        `).join('')}
+    </div>
+
+    <div style="margin-top: 30px; padding: 15px; border: 2px solid #ff9900; background-color: #fff8e1;">
+        <h4>🔧 Production Implementation Required</h4>
+        <p>To fully implement your requirements, the backend needs enhancement to:</p>
+        <ul>
+            <li>Read actual uploaded Word document files from storage</li>
+            <li>Process documents using libraries like docx or mammoth.js</li>
+            <li>Replace tags while preserving original formatting, fonts, and alignment</li>
+            <li>Generate proper .docx files with blue highlighting for replaced tags</li>
+            <li>Maintain document structure, headers, footers, tables, etc.</li>
+        </ul>
+        <p><strong>Current Status:</strong> This is a preview showing how the conversion would work. The actual Word document processing requires backend document manipulation capabilities.</p>
+    </div>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${template.name}-converted.txt`;
+    a.download = `${template.name}-converted-preview.html`;
     a.click();
     URL.revokeObjectURL(url);
     
-    toast.success('Converted document downloaded');
+    toast.success('Converted document preview downloaded. For actual Word document processing, backend enhancement is required.');
   };
 
   const handleUnmappedClick = (templateId: string) => {
