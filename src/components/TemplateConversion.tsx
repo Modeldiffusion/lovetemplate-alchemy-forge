@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { 
   FileText, 
   CheckCircle2, 
@@ -11,7 +13,9 @@ import {
   Eye,
   History,
   ArrowRightLeft,
-  Zap
+  Zap,
+  FileDown,
+  ExternalLink
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTemplates } from "@/hooks/useTemplates";
@@ -27,12 +31,23 @@ interface TemplateConversionData {
   unmappedTags: number;
   status: 'ready' | 'processing' | 'completed' | 'error';
   lastConverted?: string;
+  convertedContent?: string;
+}
+
+interface ConversionResult {
+  original: string;
+  replacement: string;
+  type: 'document-level' | 'field-mapping' | 'custom-mapping' | 'unchanged';
+  replaced: boolean;
 }
 
 export const TemplateConversion = () => {
   const [conversionData, setConversionData] = useState<TemplateConversionData[]>([]);
   const [processingTemplates, setProcessingTemplates] = useState<Set<string>>(new Set());
+  const [viewingTemplate, setViewingTemplate] = useState<{ id: string; name: string; content: string } | null>(null);
+  const [conversionResults, setConversionResults] = useState<Map<string, ConversionResult[]>>(new Map());
   
+  const navigate = useNavigate();
   const { templates } = useTemplates();
   const { extractedTags, tagMappings, internalTags } = useExtractedTags();
 
@@ -112,7 +127,7 @@ export const TemplateConversion = () => {
       const templateTags = extractedTags.filter(tag => tag.template_id === templateId);
       
       // Process each tag according to the conversion logic
-      const processedTags = templateTags.map(tag => {
+      const processedTags: ConversionResult[] = templateTags.map(tag => {
         const mapping = tagMappings.find(m => m.extracted_tag_id === tag.id);
         const uniqueMapping = internalTags.find(internal => 
           internal.name.toLowerCase() === tag.text.toLowerCase()
@@ -126,7 +141,7 @@ export const TemplateConversion = () => {
             return {
               original: tag.text,
               replacement: docLevelValue,
-              type: 'document-level',
+              type: 'document-level' as const,
               replaced: true
             };
           }
@@ -142,7 +157,7 @@ export const TemplateConversion = () => {
             return {
               original: tag.text,
               replacement: internalTag.name,
-              type: 'field-mapping',
+              type: 'field-mapping' as const,
               replaced: true
             };
           }
@@ -164,7 +179,7 @@ export const TemplateConversion = () => {
             return {
               original: tag.text,
               replacement: customValue,
-              type: 'custom-mapping',
+              type: 'custom-mapping' as const,
               replaced: true
             };
           }
@@ -174,22 +189,40 @@ export const TemplateConversion = () => {
         return {
           original: tag.text,
           replacement: tag.text,
-          type: 'unchanged',
+          type: 'unchanged' as const,
           replaced: false
         };
       });
 
+      // Generate converted content (simulate document conversion)
+      const originalContent = `Template: ${template.name}\n\nOriginal Content:\n` + 
+        templateTags.map(tag => `Tag: ${tag.text} (Context: ${tag.context || 'N/A'})`).join('\n');
+      
+      let convertedContent = originalContent;
+      processedTags.forEach(tag => {
+        if (tag.replaced) {
+          // Replace with color coding for replaced tags
+          const coloredReplacement = `[REPLACED: ${tag.replacement}]`;
+          convertedContent = convertedContent.replace(tag.original, coloredReplacement);
+        }
+      });
+
+      // Store conversion results
+      setConversionResults(prev => new Map(prev.set(templateId, processedTags)));
+
       // Update conversion data
       setConversionData(prev => prev.map(item => 
         item.id === templateId 
-          ? { ...item, status: 'completed', lastConverted: new Date().toISOString() }
+          ? { 
+              ...item, 
+              status: 'completed', 
+              lastConverted: new Date().toISOString(),
+              convertedContent 
+            }
           : item
       ));
 
       toast.success(`Template "${template.name}" converted successfully! ${processedTags.filter(t => t.replaced).length} tags replaced.`);
-      
-      // Here you would typically save the converted template to the backend
-      console.log('Conversion results:', processedTags);
       
     } catch (error) {
       toast.error('Conversion failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -275,8 +308,57 @@ export const TemplateConversion = () => {
   };
 
   const handleViewTemplate = (templateId: string) => {
-    // This would open the template in a new window/tab
-    toast.info('Template viewer will be implemented');
+    const template = templates.find(t => t.id === templateId);
+    const conversionResult = conversionData.find(c => c.id === templateId);
+    
+    if (!template) return;
+    
+    // Get template tags for content generation
+    const templateTags = extractedTags.filter(tag => tag.template_id === templateId);
+    const sampleContent = `Template: ${template.name}
+
+Content Preview:
+${templateTags.map(tag => `${tag.text} - Context: ${tag.context || 'No context available'}`).join('\n')}
+
+${conversionResult?.convertedContent ? `\n--- CONVERTED VERSION ---\n${conversionResult.convertedContent}` : ''}
+
+--- Template Metadata ---
+File Type: ${template.file_type || 'Unknown'}
+Size: ${template.file_size ? `${(template.file_size / 1024).toFixed(2)} KB` : 'Unknown'}
+Uploaded: ${new Date(template.uploaded_at).toLocaleDateString()}
+Status: ${template.status}`;
+
+    setViewingTemplate({
+      id: templateId,
+      name: template.name,
+      content: sampleContent
+    });
+  };
+
+  const handleDownloadConverted = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    const conversionResult = conversionData.find(c => c.id === templateId);
+    
+    if (!template || !conversionResult?.convertedContent) {
+      toast.error('No converted content available');
+      return;
+    }
+
+    const blob = new Blob([conversionResult.convertedContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${template.name}-converted.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast.success('Converted document downloaded');
+  };
+
+  const handleUnmappedClick = (templateId: string) => {
+    // Navigate to mapping interface with template field mapping tab and template selected
+    navigate(`/mapping?tab=template-mapping&template=${templateId}`);
+    toast.info('Navigating to template field mapping for this template');
   };
 
   const handleViewHistory = (templateId: string) => {
@@ -404,9 +486,16 @@ export const TemplateConversion = () => {
                   <TableCell>
                     <Badge 
                       variant={template.unmappedTags > 0 ? "destructive" : "secondary"} 
-                      className="font-mono"
+                      className={cn(
+                        "font-mono",
+                        template.unmappedTags > 0 && "cursor-pointer hover:bg-destructive/80"
+                      )}
+                      onClick={() => template.unmappedTags > 0 && handleUnmappedClick(template.id)}
                     >
                       {template.unmappedTags}
+                      {template.unmappedTags > 0 && (
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      )}
                     </Badge>
                   </TableCell>
                   
@@ -442,14 +531,28 @@ export const TemplateConversion = () => {
                         size="sm"
                         variant="outline"
                         onClick={() => handleDownloadMapping(template.id)}
+                        title="Download Mapping CSV"
                       >
                         <Download className="w-4 h-4" />
                       </Button>
+
+                      {template.status === 'completed' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDownloadConverted(template.id)}
+                          title="Download Converted Document"
+                          className="bg-success/10 hover:bg-success/20"
+                        >
+                          <FileDown className="w-4 h-4" />
+                        </Button>
+                      )}
                       
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleViewTemplate(template.id)}
+                        title="View Template"
                       >
                         <Eye className="w-4 h-4" />
                       </Button>
@@ -458,6 +561,7 @@ export const TemplateConversion = () => {
                         size="sm"
                         variant="outline"
                         onClick={() => handleViewHistory(template.id)}
+                        title="View History"
                       >
                         <History className="w-4 h-4" />
                       </Button>
@@ -476,6 +580,23 @@ export const TemplateConversion = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Template Viewer Dialog */}
+      <Dialog open={!!viewingTemplate} onOpenChange={() => setViewingTemplate(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Template Viewer: {viewingTemplate?.name}</DialogTitle>
+            <DialogDescription>
+              View template content and converted version
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg font-mono">
+              {viewingTemplate?.content}
+            </pre>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

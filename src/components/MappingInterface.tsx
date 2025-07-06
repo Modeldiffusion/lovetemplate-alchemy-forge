@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, Upload, Link, Tag, FileSpreadsheet } from "lucide-react";
@@ -8,6 +9,17 @@ import { TagMappingInterface } from "./TagMappingInterface";
 import { UniqueTagMapping } from "./UniqueTagMapping";
 
 export const MappingInterface = () => {
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState("upload-fields");
+
+  // Handle tab and template selection from URL parameters
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['upload-fields', 'upload-mapping', 'unique-mapping', 'template-mapping'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -20,7 +32,7 @@ export const MappingInterface = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="upload-fields" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="upload-fields">Upload Fields</TabsTrigger>
           <TabsTrigger value="upload-mapping">Upload Mapping Details</TabsTrigger>

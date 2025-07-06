@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ interface TemplateTagMapping {
 }
 
 export const TagMappingInterface = () => {
+  const [searchParams] = useSearchParams();
   const [selectedDocument, setSelectedDocument] = useState<string>("all");
   const [templateMappings, setTemplateMappings] = useState<TemplateTagMapping[]>([]);
   const [showAddTagDialog, setShowAddTagDialog] = useState(false);
@@ -50,6 +52,15 @@ export const TagMappingInterface = () => {
     createTagMapping,
     updateTagMapping,
   } = useExtractedTags(selectedDocument === "all" ? undefined : selectedDocument);
+
+  // Handle template selection from URL parameters
+  useEffect(() => {
+    const templateParam = searchParams.get('template');
+    if (templateParam && templates.some(t => t.id === templateParam)) {
+      setSelectedDocument(templateParam);
+      toast.info('Showing mappings for selected template');
+    }
+  }, [searchParams, templates]);
 
   // Initialize template mappings from extracted tags
   useEffect(() => {
