@@ -144,7 +144,7 @@ serve(async (req) => {
             originalFileType: fileType,
             fileSize: fileContent.length
           },
-          status: 'processed'
+          status: 'completed'
         })
         .eq('id', templateId);
 
