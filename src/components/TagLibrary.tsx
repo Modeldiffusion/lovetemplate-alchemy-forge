@@ -212,6 +212,35 @@ export const TagLibrary = () => {
     toast.info("Edit functionality will be implemented");
   };
 
+  const handleCustomMappingUpdate = async (extractedTagId: string, customMapping: string) => {
+    try {
+      // Find existing mapping
+      const existingMapping = tagMappings.find(m => m.extracted_tag_id === extractedTagId);
+      
+      const mappingLogic = customMapping ? `Custom: ${customMapping}` : null;
+      const status = customMapping ? 'logic' : 'unmapped';
+      
+      if (existingMapping) {
+        await updateTagMapping(existingMapping.id, {
+          mapping_logic: mappingLogic,
+          status: status
+        });
+      } else {
+        await createTagMapping({
+          extracted_tag_id: extractedTagId,
+          mapping_logic: mappingLogic,
+          confidence: 85
+        });
+      }
+      
+      await refetch();
+      toast.success("Custom mapping updated successfully");
+    } catch (error) {
+      console.error('Custom mapping update error:', error);
+      toast.error("Failed to update custom mapping");
+    }
+  };
+
   const handleDeleteTag = async (item: TagLibraryItem) => {
     try {
       // Find all extracted tags with the same text (since TagLibrary groups by text)
@@ -656,22 +685,31 @@ export const TagLibrary = () => {
                            )}
                         </div>
                        </TableCell>
-                       <TableCell>
-                         <div className="max-w-xs">
-                           {item.customMapping ? (
-                             <div className="space-y-1">
-                               <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                                 Custom Logic
-                               </Badge>
-                               <div className="text-xs text-muted-foreground">
-                                 {item.customMapping}
-                               </div>
-                             </div>
-                           ) : (
-                             <span className="text-muted-foreground text-sm">No custom mapping</span>
-                           )}
-                         </div>
-                       </TableCell>
+                        <TableCell>
+                          <div className="max-w-xs space-y-2">
+                            {item.customMapping && (
+                              <div className="space-y-1">
+                                <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                                  Custom Logic
+                                </Badge>
+                                <div className="text-xs text-muted-foreground">
+                                  {item.customMapping}
+                                </div>
+                              </div>
+                            )}
+                            <Input
+                              placeholder="Enter custom mapping logic..."
+                              defaultValue={item.customMapping || ''}
+                              onBlur={async (e) => {
+                                const newValue = e.target.value.trim();
+                                if (newValue !== (item.customMapping || '')) {
+                                  await handleCustomMappingUpdate(item.extractedTagId, newValue);
+                                }
+                              }}
+                              className="w-48 text-xs"
+                            />
+                          </div>
+                        </TableCell>
                        <TableCell>
                         <div className="max-w-xs">
                           {item.applicableDocuments.length > 0 ? (

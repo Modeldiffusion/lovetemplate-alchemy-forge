@@ -286,21 +286,20 @@ export const TagMappingInterface = () => {
             [isDocLevel ? 'customMappingDocLevel' : 'customMapping']: customValue,
           };
           
-          // If document level mapping is provided, automatically switch to document type
-          if (isDocLevel && customValue.trim()) {
+          // Determine proper status based on all mapping types
+          const hasFieldMapping = !!mapping.mappingField;
+          const hasCustomMapping = !isDocLevel ? !!customValue.trim() : !!mapping.customMapping?.trim();
+          const hasDocLevelMapping = isDocLevel ? !!customValue.trim() : !!mapping.customMappingDocLevel?.trim();
+          
+          if (hasDocLevelMapping) {
             updates.mappingType = 'document';
             updates.mappingStatus = 'mapped';
-          } else if (isDocLevel && !customValue.trim()) {
-            // If document level mapping is cleared, revert to unique type and check for unique mapping
-            const uniqueMapping = internalTags.find(internal => 
-              internal.name.toLowerCase() === mapping.tagName.toLowerCase()
-            );
-            updates.mappingType = 'unique';
-            updates.mappingField = uniqueMapping?.id;
-            updates.mappingStatus = uniqueMapping ? 'mapped' : (mapping.customMapping ? 'mapped' : 'unmapped');
+          } else if (hasCustomMapping) {
+            updates.mappingStatus = 'mapped';
+          } else if (hasFieldMapping) {
+            updates.mappingStatus = 'mapped';
           } else {
-            // Regular custom mapping
-            updates.mappingStatus = customValue ? 'mapped' : 'unmapped';
+            updates.mappingStatus = 'unmapped';
           }
           
           return { ...mapping, ...updates };
