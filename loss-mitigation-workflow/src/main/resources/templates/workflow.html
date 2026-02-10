@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loss Mitigation Collections Workflow - Outamation</title>
+    <link rel="stylesheet" th:href="@{/css/workflow.css}"/>
+</head>
+<body>
+    <!-- Full-Height Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-logo">&#127968;</span>
+            <span class="sidebar-header-text">Loss Mitigation Workflow</span>
+        </div>
+        <div class="workflow-steps" id="workflowSteps">
+            <!-- Populated dynamically by JS -->
+        </div>
+        <div class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">
+            <span class="toggle-icon">&#9664;</span>
+            <span class="toggle-text">Collapse Menu</span>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content" id="mainContent">
+        <!-- Loan Details Header -->
+        <div class="loan-details-header" id="loanDetailsHeader">
+            <div class="loan-info-grid" id="loanInfoGrid">
+                <!-- Populated after Step 1 -->
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs-container">
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('workflow')">
+                    <span>&#128260;</span> Workflow
+                </div>
+                <div class="tab" onclick="switchTab('script')">
+                    <span>&#128221;</span> Agent Prompt
+                </div>
+                <div class="tab" onclick="switchTab('checklist')">
+                    <span>&#10003;</span> Checklist
+                </div>
+                <div class="tab" onclick="switchTab('documents')">
+                    <span>&#128196;</span> Documents
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content-wrapper">
+            <div id="workflow-panel" class="tab-panel active">
+                <div id="workflowContent"></div>
+            </div>
+
+            <div id="script-panel" class="tab-panel">
+                <div class="script-section">
+                    <div class="script-title">&#128222; Collections Agent Prompt</div>
+                    <div class="script-content" id="scriptContent">
+                        Select a step to view the agent prompt.
+                    </div>
+                </div>
+            </div>
+
+            <div id="checklist-panel" class="tab-panel">
+                <h2 style="margin-bottom: 25px; color: var(--primary-blue);">&#128203; Agent Checklist</h2>
+                <div id="checklistContent"></div>
+            </div>
+
+            <div id="documents-panel" class="tab-panel">
+                <h2 style="margin-bottom: 25px; color: var(--primary-blue);">&#128196; Required Documents</h2>
+                <div id="documentsContent">
+                    <p style="color: #666; text-align: center; padding: 40px;">Select a step to view required documents.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inject server-side step data as JSON for the frontend -->
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        var WORKFLOW_STEPS_JSON = /*[(${stepsJson})]*/ '[]';
+        /*]]>*/
+    </script>
+    <script th:src="@{/js/workflow.js}"></script>
+</body>
+</html>
